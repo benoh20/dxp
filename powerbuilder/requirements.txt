@@ -1,1 +1,24 @@
-Django~=5.1.2
+# Web Framework
+django>=5.0.0
+django-environ==0.11.2  # For managing .env variables
+
+# AI Orchestration & State
+langgraph>=0.2.0        # The Orchestrator engine
+langchain>=0.3.0        # Foundational AI components
+langchain-openai>=0.2.0 # OpenAI specific integration
+langchain-community>=0.3.0 # Extra community tools (like PDF loaders)
+
+# Vector Database
+pinecone-client>=4.1.0  # Pinecone Python SDK
+langchain-pinecone>=0.2.0 # Bridge between LangChain and Pinecone
+
+# Document Parsing & Export
+llama-parse>=0.5.0      # For high-fidelity PDF/table extraction
+python-docx==1.1.0      # For creating Word documents programmatically
+markdown==3.5.2         # To parse AI Markdown output
+beautifulsoup4==4.12.3  # Required for some document conversions
+
+# Utilities
+python-dotenv==1.0.1    # To load your .env file
+openai>=1.12.0          # The core OpenAI library
+pydantic>=2.6.0         # For data validation in state.py
