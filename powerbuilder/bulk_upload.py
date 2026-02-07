@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from llama_parse import LlamaParse
-from pinecone import Pinecone
+from langchain_core.documents import Document as LCDocument
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import OpenAIEmbeddings
 
@@ -10,7 +10,7 @@ load_dotenv()
 def bulk_upsert(directory_path):
     # 1. Initialize Pinecone & Index
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-    index_name = os.getenv("PINECONE_INDEX_NAME")
+    index_name = os.getenv("OPENAI_PINECONE_INDEX_NAME")
     index = pc.Index(index_name)
     
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -22,7 +22,7 @@ def bulk_upsert(directory_path):
     for filename in files:
         # 3. THE CHECK: Ask Pinecone if this file already exists in the 'general' namespace
         existing_vectors = index.query(
-            namespace="general",
+            namespace="__default__",
             filter={"filename": {"$eq": filename}},
             top_k=1, # We only need to find one to know it's there
             vector=[0] * 1536 # Dummy vector for a metadata-only search
@@ -46,7 +46,7 @@ def bulk_upsert(directory_path):
             docs, 
             embeddings, 
             index_name=index_name,
-            namespace="general"
+            namespace="__default__"
         )
         print(f"Successfully uploaded {filename}.")
 
