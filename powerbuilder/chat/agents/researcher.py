@@ -41,6 +41,6 @@ def research_node(state: AgentState):
 # Local testing
 
 if __name__ == "__main__":
-    test_state = {"query": "What do young people care about?","org_namespace": "boh_key"}
+    test_state = {"query": "What does the research you have say about young voters?","org_namespace": "boh_key"}
     result = research_node(test_state)
     print(f"Retrieved {len(result['research_results'])} chunks.")
