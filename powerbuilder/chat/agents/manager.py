@@ -1,8 +1,10 @@
 import os
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .researcher import research_node
 from langchain_openai import ChatOpenAI
+
+from .researcher import research_node
+from .ingestor import ingestor_node
 
 # YOU NEED TO IMPORT NEW AGENTS AS THEY GET BUILT
 # from .precincts import precincts_node
@@ -10,7 +12,6 @@ from langchain_openai import ChatOpenAI
 # from .win_number import win_number_node
 # from .messaging import messaging_node
 # from .cost_calculator import cost_node
-# from .ingestor import ingestor_node
 # from .export import export_node
 
 
@@ -124,7 +125,10 @@ workflow = StateGraph(AgentState)
 # adding in all agents here
 workflow.add_node("triage_router", lambda state: state)
 workflow.add_node("intent_router", intent_router_node)
+
 workflow.add_node("researcher", research_node)
+workflow.add_node("ingestor", ingestor_node)
+
 workflow.add_node("synthesizer", synthesizer_node)
 
 # workflow.add_node("election_results",elections_node)
@@ -132,7 +136,7 @@ workflow.add_node("synthesizer", synthesizer_node)
 # workflow.add_node("win_number", win_number_node)
 # workflow.add_node("messaging", messaging_node)
 # workflow.add_node("cost_calculator", cost_node)
-# workflow.add_node("ingestor", ingestor_node)
+
 # workflow.add_node("export", export_node)
 
 # Set pathways and routing logic via edges

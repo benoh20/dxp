@@ -21,7 +21,12 @@ def research_node(state: AgentState):
     print(f"DEBUG: Searching Index '{index_name}' in Namespace '{org_namespace}'")
 
 # search the general index for knowledge
-    general_store = PineconeVectorStore(index_name=index_name, embedding=embeddings, namespace="__default__", text_key="text")
+    general_store = PineconeVectorStore(
+        index_name=index_name,
+        embedding=embeddings, 
+        namespace="__default__", 
+        text_key="text"
+    )
     general_docs = general_store.similarity_search(query, k=10)
 
 # Debugging
@@ -29,14 +34,23 @@ def research_node(state: AgentState):
 
 # search the domain-specific index
     org_docs = []
-    if org_namespace:
-        org_store = PineconeVectorStore(index_name=index_name, embedding=embeddings, namespace=org_namespace)
+    if org_namespace and org_namespace != "general":
+        org_store = PineconeVectorStore(
+            index_name=index_name
+            , embedding=embeddings
+            , namespace=org_namespace
+            , text_key="text"
+        )
         org_docs = org_store.similarity_search(query, k=10)
 
 # Combine the general and domain index search results
-    all_findings = [doc.page_content for doc in (general_docs + org_docs)]
+    formatted_findings = []
+    for doc in (general_docs + org_docs):
+        source = doc.metadata.get("source", "General Knowledge")
+        memo = f"--- MEMO FROM SOURCE: {source} ---\n{doc.page_content}\n"
+        formatted_findings.append(memo)
 
-    return {"research_results": all_findings}
+    return {"research_results": formatted_findings}
 
 # Local testing
 
