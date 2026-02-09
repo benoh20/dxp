@@ -44,3 +44,7 @@ class DataFetcher:
         }
         # ... (rest of your request logic)
 
+# ADD IN OPPO RESEARCH API FROM 21ST CENTURY BRIDGE
+# ADD IN ELECTION RESULTS API KEY
+# ADD IN FEC / CAMPAIGN FINANCE API KEY?
+
