@@ -116,8 +116,9 @@ class ElectionDataUtility:
 
         try:
             # 1. Fetch MEDSL constituency-returns (1976-2018)
-            house_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["house"], low_memory=False)
-            senate_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["senate"], low_memory=False)
+            # latin-1 encoding required: MEDSL CSVs contain non-UTF-8 bytes (e.g. accented candidate names)
+            house_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["house"], low_memory=False, encoding="latin-1")
+            senate_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["senate"], low_memory=False, encoding="latin-1")
 
             # 2. General elections only (exclude primaries, runoffs)
             house_df = house_df[house_df["stage"] == "gen"]

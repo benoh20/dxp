@@ -146,9 +146,27 @@ class WinNumberAgent:
         )
         avg_turnout_pct = subset["turnout_pct"].mean() if has_turnout else 0.50
 
+        # Track which climate years actually had data vs. were expected
+        years_used = (
+            sorted(subset.dropna(subset=["turnout_pct"])["year"].unique().tolist())
+            if has_turnout else []
+        )
+        years_missing = sorted(set(relevant_years) - set(years_used))
+
         # 5. Final math
         projected_turnout = total_cvap * avg_turnout_pct
         win_number = int(projected_turnout * victory_margin)
+
+        # Build data_notes: flag any missing climate years so the export surfaces gaps
+        note_parts = [f"Midterm projection based on {years_used}."]
+        if 2022 in years_missing and district_type in ("congressional", "state_house", "state_senate"):
+            note_parts.append(
+                "2022 cycle data not yet integrated — projection may skew high "
+                "in high-enthusiasm districts."
+            )
+        elif years_missing:
+            note_parts.append(f"Cycles not yet available: {years_missing}.")
+        data_notes = " ".join(note_parts)
 
         return {
             "win_number":         win_number,
@@ -157,6 +175,7 @@ class WinNumberAgent:
             "avg_turnout_pct":    round(avg_turnout_pct, 4),
             "victory_margin":     victory_margin,
             "historical_context": f"Averaged cycles: {relevant_years}",
+            "data_notes":         data_notes,
         }
 
     @staticmethod

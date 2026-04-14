@@ -173,9 +173,9 @@ class DataFetcher:
                 normalized.append({
                     "name": candidate.get("name"),
                     "party": candidate.get("party_full"),
-                    "total_receipts": f"${candidate.get('receipts', 0):,.2f}",
-                    "total_disbursements": f"${candidate.get('disbursements', 0):,.2f}",
-                    "cash_on_hand": f"${candidate.get('cash_on_hand_end_period', 0):,.2f}"
+                    "total_receipts": f"${float(candidate.get('receipts') or 0):,.2f}",
+                    "total_disbursements": f"${float(candidate.get('disbursements') or 0):,.2f}",
+                    "cash_on_hand": f"${float(candidate.get('cash_on_hand_end_period') or 0):,.2f}"
                 })
             return normalized
         return {"error": "FEC API unreachable"}
