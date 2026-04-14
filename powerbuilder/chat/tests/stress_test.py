@@ -8,7 +8,7 @@ def run_stress_test():
 
     # 1. Test Ingestor
     print("- Testing Election Ingestor (VA)...")
-    success = ElectionDataUtility.sync_historical_data("51")
+    success = ElectionDataUtility.sync_national_database(state_fips="51")
     assert success, "❌ Ingestor failed to sync VA data."
 
     # 2. Test Win Number Logic

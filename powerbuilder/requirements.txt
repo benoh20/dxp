@@ -15,6 +15,7 @@ langchain-pinecone>=0.2.0 # Bridge between LangChain and Pinecone
 # Document Parsing & Export
 llama-parse>=0.5.0      # For high-fidelity PDF/table extraction
 python-docx==1.1.0      # For creating Word documents programmatically
+openpyxl>=3.1.0         # For creating Excel workbooks (.xlsx)
 markdown==3.5.2         # To parse AI Markdown output
 beautifulsoup4==4.12.3  # Required for some document conversions
 
@@ -22,3 +23,9 @@ beautifulsoup4==4.12.3  # Required for some document conversions
 python-dotenv==1.0.1    # To load your .env file
 openai>=1.12.0          # The core OpenAI library
 pydantic>=2.6.0         # For data validation in state.py
+pandas>=2.0.0           # For election data and precinct CSV processing
+requests>=2.31.0        # For Census and FEC API calls
+
+# Geospatial
+geopandas>=0.14.0       # Spatial joins and TIGER/Line shapefile loading
+topojson>=1.5           # TopoJSON parsing fallback if fiona driver unavailable

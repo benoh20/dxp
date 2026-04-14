@@ -3,6 +3,7 @@
 # --- BASIC DEMOGRAPHICS ---
 CENSUS_DEMOGRAPHICS = {
     "total_population": "B01003_001E",
+    "total_cvap": "B29001_001E",  # Citizen Voting Age Population (18+)
     "median_age": "B01002_001E",
     "white": "B03002_003E",
     "black": "B03002_004E",

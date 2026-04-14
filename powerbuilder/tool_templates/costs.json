@@ -1,0 +1,26 @@
+{
+  "_note": "Standard per-contact cost estimates for campaign tactics. Edit any value to reflect your market, vendor quotes, or org rates. Loaded at runtime by finance_agent.py and messaging.py.",
+  "canvassing": {
+    "cost_per_door": 7.00,
+    "doors_per_hour": 8,
+    "description": "Includes canvasser labor, literature, and overhead per door attempt"
+  },
+  "phones": {
+    "cost_per_contact": 1.50,
+    "description": "Includes dialer platform, volunteer coordination, and data per completed contact"
+  },
+  "mail": {
+    "cost_per_piece": 1.00,
+    "design_fee_flat": 500,
+    "description": "Print and postage per piece. Flat design fee applies once per mail program, not per piece."
+  },
+  "text": {
+    "cost_per_text": 0.05,
+    "description": "Peer-to-peer texting platform cost per outgoing message"
+  },
+  "digital": {
+    "cost_per_impression": 0.02,
+    "minimum_spend": 1000,
+    "description": "Average CPM-based rate across Facebook, Instagram, and display. Minimum applies per platform per flight."
+  }
+}

@@ -21,11 +21,15 @@ class AgentState(TypedDict):
 
     # -- Routing and Logic --
     router_decision: str # this holds the intent
-    output_format: Literal["markdown", "csv", "text"] # define target file type
+    output_format: Literal["markdown", "csv", "text", "docx", "xlsx"] # define target file type
 
     # -- File Handling --
     uploaded_file_path: Optional[str] # path to new file for ingesting
 
     # -- Final Output --
     final_answer: str
-    generated_file_path: str
+    generated_file_path: Optional[str]  # path to generated output file
+
+    # -- Observability --
+    errors: Annotated[List[str], operator.add]        # non-fatal errors from any agent
+    active_agents: Annotated[List[str], operator.add] # log of agents called this run
