@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_pinecone import PineconeVectorStore
-from ..utils.llm_config import get_embedding_client
+from ..utils.llm_config import get_embedding_client, COMPARISON_MODE, LLM_PROVIDER
 
 from .state import AgentState
 
@@ -81,10 +81,18 @@ def research_node(state: AgentState, k: int = DEFAULT_K) -> dict:
     query         = state["query"]
     org_namespace = state.get("org_namespace", "general")
 
-    embeddings = get_embedding_client(model=EMBEDDING_MODEL)
-    index_name = os.getenv("OPENAI_PINECONE_INDEX_NAME")
+    # In comparison mode, route to the active provider's native embedding model
+    # and its dedicated Pinecone index.  In normal mode, always use OpenAI
+    # embeddings and the production index regardless of LLM_PROVIDER.
+    emb_cfg    = get_embedding_client(provider=LLM_PROVIDER if COMPARISON_MODE else None)
+    embeddings = emb_cfg.client
+    index_name = emb_cfg.index_name
 
-    logger.debug(f"Searching index '{index_name}' | org: '{org_namespace}' | k={k}")
+    logger.debug(
+        f"Searching index '{index_name}' | provider: '{emb_cfg.provider}' "
+        f"| model: '{emb_cfg.model}' | comparison_mode: {COMPARISON_MODE} "
+        f"| org: '{org_namespace}' | k={k}"
+    )
 
     # Core dual-namespace search — do not change
     general_store = PineconeVectorStore(
