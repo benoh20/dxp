@@ -38,7 +38,7 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_openai import ChatOpenAI
+from ..utils.llm_config import get_completion_client
 
 from .state import AgentState
 
@@ -374,11 +374,7 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
         district_label=district_lbl,
     )
 
-    llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.3,
-        openai_api_key=os.environ["OPENAI_API_KEY"],
-    )
+    llm = get_completion_client(temperature=0.3)
     return llm.invoke(
         [{"role": "system", "content": SYSTEM_PROMPT},
          {"role": "user",   "content": prompt}]

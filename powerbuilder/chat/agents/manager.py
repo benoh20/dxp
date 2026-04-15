@@ -5,7 +5,7 @@ load_dotenv()
 
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from langchain_openai import ChatOpenAI
+from ..utils.llm_config import get_completion_client
 
 from .researcher import research_node
 from .ingestor import ingestor_node
@@ -19,9 +19,7 @@ from .election_results import ElectionAnalystAgent
 
 # Define LLM and temperature for workflow
 def get_model():
-    return ChatOpenAI(model="gpt-4o"
-                      , temperature=0.3
-                      , openai_api_key=os.environ["OPENAI_API_KEY"])
+    return get_completion_client(temperature=0.3)
 
 # Check if a file needs to be ingested first
 def triage_router(state: AgentState):
@@ -154,3 +152,50 @@ workflow.add_edge("election_results", "intent_router")
 workflow.add_edge("synthesizer", END)
 
 manager_app = workflow.compile()
+
+
+# ---------------------------------------------------------------------------
+# View-facing helper
+# ---------------------------------------------------------------------------
+
+def run_query(
+    query: str,
+    org_namespace: str,
+    output_format: str = "markdown",
+    uploaded_file_path: str | None = None,
+    recursion_limit: int = 50,
+) -> dict:
+    """
+    Execute the Powerbuilder pipeline for a single user query.
+
+    This is the only entry point that Django views should call.
+    It ensures org_namespace is always injected into AgentState from
+    a trusted source (the session), never from the HTTP request body.
+
+    Args:
+        query:              The user's natural-language question.
+        org_namespace:      Pinecone namespace from request.session — scopes
+                            all reads and writes to the correct org.
+        output_format:      One of 'markdown', 'text', 'docx', 'xlsx', 'csv'.
+        uploaded_file_path: Local path to a file for the ingestor, if any.
+        recursion_limit:    LangGraph recursion cap (default 50).
+
+    Returns:
+        The final AgentState dict with keys: final_answer, active_agents,
+        errors, generated_file_path, org_namespace.
+    """
+    initial_state: dict = {
+        "query":         query,
+        "org_namespace": org_namespace,
+        "output_format": output_format,
+    }
+    if uploaded_file_path:
+        initial_state["uploaded_file_path"] = uploaded_file_path
+
+    result = manager_app.invoke(
+        initial_state,
+        config={"recursion_limit": recursion_limit},
+    )
+    # Surface the namespace so callers can log/audit which org was served
+    result["org_namespace"] = org_namespace
+    return result

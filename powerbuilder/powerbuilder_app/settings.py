@@ -63,7 +63,14 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Blocks unauthenticated POST requests to query endpoints with HTTP 401
+    'chat.middleware.QueryAuthMiddleware',
 ]
+
+# Auth redirects
+LOGIN_URL = '/auth/login/'
+LOGIN_REDIRECT_URL = '/chat/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
 
 ROOT_URLCONF = 'powerbuilder_app.urls'
 

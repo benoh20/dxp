@@ -8,8 +8,8 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
+from ..utils.llm_config import get_embedding_client
 
 from .state import AgentState
 
@@ -81,7 +81,7 @@ def research_node(state: AgentState, k: int = DEFAULT_K) -> dict:
     query         = state["query"]
     org_namespace = state.get("org_namespace", "general")
 
-    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    embeddings = get_embedding_client(model=EMBEDDING_MODEL)
     index_name = os.getenv("OPENAI_PINECONE_INDEX_NAME")
 
     logger.debug(f"Searching index '{index_name}' | org: '{org_namespace}' | k={k}")

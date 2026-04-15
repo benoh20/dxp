@@ -21,7 +21,7 @@ from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
-from langchain_openai import ChatOpenAI
+from ..utils.llm_config import get_completion_client
 
 from .state import AgentState
 
@@ -357,11 +357,7 @@ def messaging_node(state: AgentState) -> dict:
     # -----------------------------------------------------------------------
     # 3. Single LLM call — all five formats, separated by section markers
     # -----------------------------------------------------------------------
-    llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.4,  # modest creativity for copywriting, grounded by explicit constraints
-        openai_api_key=os.environ["OPENAI_API_KEY"],
-    )
+    llm = get_completion_client(temperature=0.4)  # modest creativity for copywriting
 
     prompt = f"""You are an expert field organizer and political messaging strategist.
 Generate targeted campaign messaging materials for the {district_label}.

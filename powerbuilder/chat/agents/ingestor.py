@@ -91,7 +91,19 @@ def extract_doc_metadata(text: str, llm) -> dict:
 def ingestor_node(state: AgentState):
     file_path     = state.get("uploaded_file_path")
     org_namespace = state.get("org_namespace")
-    filename      = os.path.basename(file_path)
+    filename      = os.path.basename(file_path) if file_path else ""
+
+    # 'general' is the shared read-only namespace for unaffiliated users.
+    # Writing to it is blocked so one user cannot pollute the shared index.
+    # Authenticated org members write to their own isolated namespace.
+    if org_namespace == "general":
+        return {
+            "research_results": [
+                "Document upload is not available for guest users. "
+                "Please register with your organisation email to upload research."
+            ],
+            "active_agents": ["ingestor"],
+        }
 
     if not file_path or not os.path.exists(file_path):
         return {"research_results": ["Error: File path not found."]}
