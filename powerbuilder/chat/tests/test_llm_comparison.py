@@ -403,8 +403,9 @@ class TestSection1Results:
                 None,
             )
             assert r is not None, f"No result for provider '{name}'"
-            if r.get("error") and "does not exist" in r["error"]:
-                pytest.skip(f"Index for {name} not yet created — run comparison_ingestor.py")
+            _SKIP_PHRASES = ("does not exist", "API_KEY is required", "decommissioned", "was removed")
+            if r.get("error") and any(phrase in r["error"] for phrase in _SKIP_PHRASES):
+                pytest.skip(f"{name} skipped: {r['error']}")
             assert not r.get("error"), f"{name} error: {r['error']}"
             assert len(r.get("completion_answer", "")) > 20, \
                 f"{name} returned an empty answer"

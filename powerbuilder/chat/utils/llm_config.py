@@ -64,7 +64,7 @@ SUPPORTED_PROVIDERS = [
 _DEFAULT_MODELS: dict[str, str] = {
     "openai":    "gpt-4o",
     "anthropic": "claude-sonnet-4-5",
-    "gemini":    "gemini-1.5-pro",
+    "gemini":    "gemini-2.5-flash",
     "llama":     "llama-3.1-70b-versatile",
     "mistral":   "mistral-large-latest",
     "cohere":    "command-r-plus",
@@ -76,7 +76,7 @@ _DEFAULT_MODELS: dict[str, str] = {
 _DEFAULT_EMBEDDING_MODELS: dict[str, str | None] = {
     "openai":    "text-embedding-3-small",
     "anthropic": None,                          # no native embedding API
-    "gemini":    "models/text-embedding-004",
+    "gemini":    "models/gemini-embedding-001",
     "llama":     "BAAI/bge-base-en-v1.5",       # via Together.ai
     "mistral":   "mistral-embed",
     "cohere":    "embed-english-v3.0",
@@ -84,16 +84,18 @@ _DEFAULT_EMBEDDING_MODELS: dict[str, str | None] = {
 }
 
 # Pinecone index name for each provider's native embedding space.
-# Providers without native embeddings map to the OpenAI index so they
-# can still do retrieval using the shared OpenAI embedding space.
+# Each entry reads from the corresponding {PROVIDER}_PINECONE_INDEX_NAME
+# environment variable, following the same convention as the existing
+# OPENAI_PINECONE_INDEX_NAME and GOOGLEAI_PINECONE_INDEX_NAME settings.
+# Providers without native embeddings (anthropic, groq) share the OpenAI index.
 PINECONE_INDEX_NAMES: dict[str, str] = {
-    "openai":    "powerbuilder-openai",
-    "anthropic": "powerbuilder-openai",   # fallback — no native embeddings
-    "gemini":    "powerbuilder-google",
-    "llama":     "powerbuilder-llama",
-    "mistral":   "powerbuilder-mistral",
-    "cohere":    "powerbuilder-cohere",
-    "groq":      "powerbuilder-openai",   # fallback — no native embeddings
+    "openai":    os.getenv("OPENAI_PINECONE_INDEX_NAME",    "powerbuilder-openai"),
+    "anthropic": os.getenv("ANTHROPIC_PINECONE_INDEX_NAME", os.getenv("OPENAI_PINECONE_INDEX_NAME", "powerbuilder-openai")),  # no native embeddings
+    "gemini":    os.getenv("GOOGLEAI_PINECONE_INDEX_NAME",  "powerbuilder-google"),
+    "llama":     os.getenv("LLAMA_PINECONE_INDEX_NAME",     "powerbuilder-llama"),
+    "mistral":   os.getenv("MISTRAL_PINECONE_INDEX_NAME",   "powerbuilder-mistral"),
+    "cohere":    os.getenv("COHERE_PINECONE_INDEX_NAME",    "powerbuilder-cohere"),
+    "groq":      os.getenv("GROQ_PINECONE_INDEX_NAME",      os.getenv("OPENAI_PINECONE_INDEX_NAME", "powerbuilder-openai")),  # no native embeddings
 }
 
 # Output dimensions for each provider's embedding model.
@@ -101,7 +103,7 @@ PINECONE_INDEX_NAMES: dict[str, str] = {
 EMBEDDING_DIMENSIONS: dict[str, int] = {
     "openai":    1536,
     "anthropic": 1536,   # uses openai embeddings
-    "gemini":    768,
+    "gemini":    3072,
     "llama":     768,
     "mistral":   1024,
     "cohere":    1024,

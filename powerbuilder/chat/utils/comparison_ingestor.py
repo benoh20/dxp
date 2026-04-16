@@ -17,20 +17,33 @@ What it does:
   1. Reads every vector+metadata chunk from the source OpenAI index
      (OPENAI_PINECONE_INDEX_NAME env var, default "openai-research-index")
      using Pinecone's list/fetch API to get the original text back.
-  2. For each provider that:
-       - Has an API key configured
-       - Has a native embedding model (anthropic and groq are skipped —
-         they have no embedding API and share the OpenAI index)
-       - Is not the source provider (openai is already indexed)
-     it creates the target Pinecone index if it does not exist, then
-     re-embeds all chunks and upserts them in batches.
+  2. For each provider in DEFAULT_PROVIDERS (gemini, cohere, anthropic):
+       - gemini and cohere use their native embedding models.
+       - anthropic has no native embedding API, so it uses OpenAI
+         text-embedding-3-small.  Its index (powerbuilder-anthropic) is
+         therefore in the same 1536-dim OpenAI embedding space, which means
+         the comparison for anthropic is completion quality only, not
+         retrieval quality.
+     For each target it creates the Pinecone index if it does not exist,
+     then re-embeds all chunks and upserts them in batches.
   3. Skips providers where the target index already has vectors unless
      --force is passed.
+  4. mistral is excluded — no Pinecone slot is allocated for it.
 
 Requirements:
-  - OPENAI_PINECONE_INDEX_NAME: source index (already populated by bulk_upload.py)
   - PINECONE_API_KEY: Pinecone access
   - Provider API keys for any provider you want to index
+
+  Index names are read from environment variables following the convention
+  {PROVIDER_NAME}_PINECONE_INDEX_NAME (matching the existing codebase pattern):
+
+    OPENAI_PINECONE_INDEX_NAME    source index + OpenAI comparison index
+    ANTHROPIC_PINECONE_INDEX_NAME target for anthropic (shares OpenAI index if unset)
+    GOOGLEAI_PINECONE_INDEX_NAME  target for gemini
+    LLAMA_PINECONE_INDEX_NAME     target for llama
+    MISTRAL_PINECONE_INDEX_NAME   target for mistral
+    COHERE_PINECONE_INDEX_NAME    target for cohere
+    GROQ_PINECONE_INDEX_NAME      target for groq (shares OpenAI index if unset)
 
 Note: Pinecone Serverless indexes on the free tier are limited to 5 total.
       Run with --dry-run first to see which providers would be created.
@@ -63,6 +76,15 @@ SOURCE_NAMESPACE = ""          # Pinecone default namespace (empty string)
 BATCH_SIZE       = 96          # vectors per upsert call — Pinecone limit is 100
 FETCH_BATCH      = 200         # IDs per fetch call
 INDEX_WAIT_SECS  = 60          # seconds to wait for a newly created index to be ready
+
+# Providers to index by default (no --provider flag given).
+# - gemini and cohere: use native embeddings → dedicated comparison indexes.
+# - anthropic: no native embeddings → uses OpenAI embeddings, comparison is
+#   completion quality only.
+# - mistral excluded: no Pinecone slot allocated.
+# - openai excluded: it is the source index, already indexed.
+# - groq/llama excluded: no keys configured.
+DEFAULT_PROVIDERS = ["gemini", "cohere", "anthropic"]
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +280,28 @@ def ingest_provider(
         result["status"] = "dry_run"
         return result
 
+    # Smoke test — embed one chunk and verify dimensions before committing to the
+    # full batch.  This catches model-name 404s and dimension mismatches early.
+    print(f"  Smoke test: embedding 1 chunk with '{emb_cfg.model}'...", flush=True)
+    try:
+        sample_vec = emb_cfg.client.embed_query(chunks[0]["text"])
+    except Exception as e:
+        result["status"] = f"smoke_test_failed ({e})"
+        print(f"  Smoke test FAILED: {e}")
+        return result
+
+    actual_dims = len(sample_vec)
+    if actual_dims != dimensions:
+        result["status"] = (
+            f"smoke_test_failed (expected {dimensions} dims, got {actual_dims}). "
+            f"Update EMBEDDING_DIMENSIONS['{provider}'] or point "
+            f"'{target_index}' at a {actual_dims}-dim index."
+        )
+        print(f"  Smoke test FAILED: {result['status']}")
+        return result
+
+    print(f"  Smoke test passed ({actual_dims} dims). Proceeding with full upsert.")
+
     # Embed + upsert
     print(f"  Re-embedding {len(chunks)} chunks with '{emb_cfg.model}'...")
     upserted = _embed_and_upsert(pc, chunks, emb_cfg, target_index)
@@ -293,22 +337,12 @@ def run(
     pc = _get_pinecone()
 
     # Resolve which providers to process
-    configured = get_configured_providers()
-    if providers:
-        targets = [
-            p for p in configured
-            if p["provider"] in [x.lower() for x in providers]
-        ]
-    else:
-        # Skip openai (it's the source) and providers without native embeddings
-        targets = [
-            p for p in configured
-            if p["provider"] != "openai" and p["embedding_available"]
-        ]
+    configured  = get_configured_providers()
+    target_list = [x.lower() for x in providers] if providers else DEFAULT_PROVIDERS
+    targets     = [p for p in configured if p["provider"] in target_list]
 
     if not targets:
-        print("No providers with native embedding support are configured.")
-        print("Set GOOGLE_API_KEY, MISTRAL_API_KEY, COHERE_API_KEY, or LLAMA_API_KEY.")
+        print(f"None of {target_list} are configured. Check your API keys.")
         return []
 
     print(f"Providers to index: {[t['provider'] for t in targets]}")
