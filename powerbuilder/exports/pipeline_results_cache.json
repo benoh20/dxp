@@ -1,0 +1,373 @@
+[
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Targeting Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with the highest concentrations of young voters aged 18-34. Based on the latest data, the following precincts have been identified as priorities:\n\n- **Trevvett**: Youth VAP of 1,942.73\n- **Tucker**: Youth VAP of 1,914.09\n- **Drewrys Bluff**: Youth VAP of 1,826.16\n- **Five Forks**: Youth VAP of 1,749.47\n- **Azalea**: Youth VAP of 1,703.58\n\nThese precincts have been selected due to their significant youth voter populations, making them strategic targets for our outreach efforts.\n\n## Messaging Strategy\n\n### Key Message Themes\n\nOur messaging should focus on issues that resonate with young voters, particularly around safety and media trust. The following themes should be emphasized:\n\n- **Empowerment**: Highlight the power of young voters to drive change on issues that matter to them.\n- **Safety**: Promote a comprehensive \"serious about safety\" platform that addresses crime prevention, crisis response, and violence prevention. This message has shown strong resonance with young and Black voters.\n- **Media Trust**: Acknowledge the different media consumption habits of young men and women, and emphasize the importance of understanding media sources and their influence.\n\n### Media Channels\n\nGiven the varied media consumption habits of young voters, our outreach should be tailored accordingly:\n\n- **Podcasts, Twitter/X, and YouTube**: Target young men who are more likely to trust these platforms.\n- **TikTok, National and Local TV News**: Engage young women who prefer these sources.\n- **Online Articles**: Utilize for broader reach, as they are trusted by a significant portion of young voters.\n\n### Messaging Formats\n\n- **Door-to-Door Canvassing**: Use a script that emphasizes empowering young voices and addresses concerns about safety and media trust.\n- **Phone Banking**: Focus on quick, engaging conversations that highlight the candidate's stance on key issues.\n- **Text Messaging**: Send concise, targeted messages with clear calls to action.\n- **Mail and Digital Ads**: Use visually appealing and informative content to reinforce our key messages.\n\n## Budget Considerations\n\nBased on historical spending patterns, the estimated budget for reaching young voters in this district includes:\n\n- **Personnel**: $469,511\n- **Mail**: $268,292\n- **Digital**: $335,365\n- **Phones**: $134,146\n- **Miscellaneous**: $134,146\n\nThese allocations are based on industry averages for Congressional races and should guide our financial planning.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 49.79,
+    "error": null
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Virginia's 7th Congressional District Canvassing Program Briefing\n\n## Overview\n\nOur campaign is considering the implementation of a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election cycle. This briefing outlines the estimated costs and strategic considerations based on historical data and recent research findings.\n\n## Estimated Costs\n\nThe cost to run a canvassing program in Virginia's 7th Congressional District is based on historical spending patterns and industry averages for similar congressional races. Below are the estimated costs:\n\n- **Total Estimated Cost:** $1,341,459\n  - **Personnel:** $469,511\n  - **Mail:** $268,292\n  - **Digital:** $335,365\n  - **Phones:** $134,146\n  - **Miscellaneous:** $134,146\n\n### Per-Contact Rates\n\n- **Door Knock:** $7.00 per door (average 8 doors/hour)\n- **Phone Call:** $1.50 per call\n- **Text Message:** $0.05 per text\n- **Mail Piece:** $1.00 per piece + $500 flat design fee\n- **Digital:** $0.02 per impression ($1,000 minimum per flight)\n\n## Strategic Considerations\n\n- **Target Demographic:** Our focus will be on voters with inconsistent voting histories, as canvassing has shown positive downstream effects on turnout, particularly among this group.\n- **Messaging:** The key message will revolve around increasing voter turnout and addressing crime concerns with a comprehensive safety plan. This message has resonated well with young and Black voters, as indicated by recent ad tests and polling data.\n- **Competitiveness:** The district is rated as \"Lean D\" with a Cook PVI of D+6. The projected turnout for 2026 is 289,239, with a win number of 150,404 votes needed for victory.\n\n## Implementation\n\n- **Canvassing Script:** Our door-to-door canvassing script will focus on engaging voters in meaningful conversations about safety and civic engagement. We will leave behind palm cards with the candidate's safety plan and voting information.\n- **Phone Banking and Texting:** These efforts will complement our door-to-door canvassing, targeting the same demographic with a consistent message.\n- **Digital and Mail Campaigns:** These will be used to reinforce our message and reach voters who may not be accessible through direct contact methods.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 54.1,
+    "error": null
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Program Briefing: Win Number for Virginia's 7th Congressional District in 2026\n\n## Overview\n\nIn preparation for the upcoming 2026 election cycle, it is crucial for our campaign to understand the win number necessary to secure victory in Virginia's 7th Congressional District. This briefing outlines the key metrics and projections that will guide our strategic planning.\n\n## Key Metrics\n\n- **Win Number**: The projected win number for Virginia's 7th Congressional District in the 2026 midterm elections is **150,404** votes.\n- **Projected Turnout**: We anticipate a voter turnout of approximately **289,239** individuals.\n- **Voter Universe**: The Citizen Voting Age Population (CVAP) for the district is estimated at **542,664**.\n- **Average Turnout Percentage**: Historically, the average turnout percentage for this district is **53.3%**.\n- **Victory Margin**: A narrow victory margin of **0.52%** is projected, emphasizing the need for a robust and targeted campaign strategy.\n\n## Historical Context\n\nThe win number and turnout projections are based on an analysis of previous midterm election cycles, specifically the years **2014, 2018, and 2022**. These cycles provide a historical context that informs our current projections and strategic approach.\n\n## Strategic Implications\n\n- **Targeted Outreach**: Given the narrow victory margin, our campaign must focus on targeted outreach to key demographics within the district to ensure we meet or exceed the projected win number.\n- **Voter Engagement**: Increasing voter engagement and turnout will be critical. Strategies should include grassroots mobilization, digital engagement, and community events.\n- **Resource Allocation**: Efficient allocation of campaign resources will be necessary to maximize impact and reach the projected win number.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 6.18,
+    "error": null
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Targeting Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with high concentrations of voters aged 18-34. The following precincts have been identified as having the highest youth voting-age population (VAP):\n\n- **Trevvett** (Youth VAP: 1,942.73)\n- **Tucker** (Youth VAP: 1,914.09)\n- **Drewrys Bluff** (Youth VAP: 1,826.16)\n- **Five Forks** (Youth VAP: 1,749.47)\n- **Azalea** (Youth VAP: 1,703.58)\n- **Hermitage** (Youth VAP: 1,647.49)\n- **Longan** (Youth VAP: 1,553.87)\n- **Chippenham** (Youth VAP: 1,465.20)\n- **John J. Wright** (Youth VAP: 1,456.81)\n- **Clover Hill** (Youth VAP: 1,295.04)\n\nThese precincts should be prioritized for outreach efforts to maximize engagement with young voters.\n\n## Messaging Strategy\nOur messaging should focus on empowering young voters to influence change on issues that matter most to them, particularly safety and media trust. The following key points should guide our communication:\n\n- **Empowerment:** Highlight the power of young voters to make a difference in shaping the future.\n- **Safety:** Emphasize a comprehensive approach to safety that includes prevention, crisis response, and violence reduction. This message resonates well with young and diverse voters.\n- **Media Trust:** Encourage voters to rely on trustworthy media sources for informed decision-making.\n\n### Media Consumption Insights\n- **Young Men:** More likely to trust podcasts, Twitter/X, and YouTube for political news.\n- **Young Women:** Prefer TikTok, national and local TV news stations, and informational articles online.\n\n### Messaging Channels\n- **Digital Ads:** Use platforms like Facebook and Instagram to reach young voters with targeted ads emphasizing safety and empowerment.\n- **Canvassing and Phone Banking:** Engage directly with voters using a script that highlights the candidate's stance on safety and media trust.\n- **Text Messaging:** Send concise, personalized messages to remind voters of the importance of their participation and the candidate's platform.\n\n### Key Message: \"Empower young voters to influence change on issues that matter to them.\"\n\n## Budget Considerations\nBased on historical spending data, the estimated budget for a comprehensive outreach program in this district is approximately $1,341,459. This includes allocations for personnel, mail, digital, phone, and miscellaneous expenses.\n\n- **Personnel:** $469,511\n- **Mail:** $268,292\n- **Digital:** $335,365\n- **Phones:** $134,146\n- **Miscellaneous:** $134,146\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 42.59,
+    "error": null
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Program Cost in Virginia's 7th Congressional District for 2026\n\n## Overview\n\nOur campaign is considering a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election cycle. This briefing outlines the estimated costs and strategic considerations based on historical data and recent research findings.\n\n## Estimated Costs\n\nBased on historical spending and industry averages for Congressional races, the estimated cost to run a canvassing program in Virginia's 7th Congressional District is detailed below:\n\n- **Total Estimated Cost:** $1,341,459\n  - **Personnel:** $469,511\n  - **Mail:** $268,292\n  - **Digital:** $335,365\n  - **Phones:** $134,146\n  - **Miscellaneous:** $134,146\n\n### Per-Contact Rates\n\n- **Door Knock:** $7.00 per door (8 doors/hour average)\n- **Phone Call:** $1.50 per call\n- **Text Message:** $0.05 per text\n- **Mail Piece:** $1.00 per piece + $500 flat design fee\n- **Digital:** $0.02 per impression ($1,000 minimum per flight)\n\n## Strategic Considerations\n\n- **Target Demographic:** Voters with inconsistent voting history, with a focus on young and Black voters who resonate with a \"serious about safety\" platform.\n- **Messaging:** Emphasize a comprehensive approach to community safety, including crime prevention, crisis response, and violence prevention.\n- **Competitiveness:** The district is rated as Lean Democratic with a Cook PVI of D+6, indicating a favorable environment for our candidate.\n\n## Research Findings\n\n- **Impact of Canvassing:** Previous analyses have shown that canvassing can have both immediate and downstream positive effects on voter turnout, particularly among voters with inconsistent voting histories.\n- **Ad Performance:** Messaging around a comprehensive \"serious about safety\" platform has been effective, especially among Black and young voters, outperforming traditional \"tough on crime\" narratives.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 36.39,
+    "error": null
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Virginia's 7th Congressional District: 2026 Win Number Briefing\n\n## Overview\n\nIn preparation for the 2026 election cycle, our campaign has focused on understanding the key metrics necessary to secure a victory in Virginia's 7th Congressional District. This briefing outlines the win number, projected turnout, and relevant historical context.\n\n## Key Metrics\n\n- **Win Number**: To secure a win in Virginia's 7th Congressional District in 2026, our campaign needs to achieve a minimum of **150,404 votes**.\n- **Projected Turnout**: The anticipated voter turnout for the district is approximately **289,239**.\n- **Voter Universe**: The total citizen voting age population (CVAP) in the district is estimated at **542,664**.\n\n## Historical Context\n\n- **Average Turnout Percentage**: Historically, the average voter turnout percentage for the district is **53.3%**.\n- **Victory Margin**: The victory margin is projected at **0.52%**, indicating a highly competitive race.\n- **Averaged Election Cycles**: The projections are based on data from past midterm election cycles, specifically the years **2014, 2018, and 2022**.\n\n## Strategic Implications\n\n- Given the narrow victory margin and competitive nature of the district, our campaign must focus on maximizing voter engagement and turnout efforts.\n- Targeted outreach and strategic allocation of resources will be crucial to surpass the win number and secure a victory.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 4.9,
+    "error": null
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Engaging Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with high concentrations of voters aged 18-34. Based on our analysis, the following precincts have the highest youth voter populations:\n\n- **Trevvett**: Youth VAP 1,942.73\n- **Tucker**: Youth VAP 1,914.09\n- **Drewrys Bluff**: Youth VAP 1,826.16\n- **Five Forks**: Youth VAP 1,749.47\n- **Azalea**: Youth VAP 1,703.58\n- **Hermitage**: Youth VAP 1,647.49\n- **Longan**: Youth VAP 1,553.87\n- **Chippenham**: Youth VAP 1,465.20\n- **John J. Wright**: Youth VAP 1,456.81\n- **Clover Hill**: Youth VAP 1,295.04\n\nThese precincts should be prioritized for outreach efforts to maximize impact among young voters.\n\n## Messaging Strategy\n\n### Key Message\nOur campaign will focus on **empowering young voters to shape their future**. This message should highlight the importance of their participation in the electoral process and how their votes can drive change on critical issues.\n\n### Issue Focus\n- **Public Safety**: Emphasize a comprehensive \"serious about safety\" platform that resonates with young and diverse voters. This approach includes preventing crime, responding effectively to crises, and stopping violence. This message has shown strong resonance with young voters, particularly those aged 18-24.\n  \n### Media and Communication Channels\n- **For Young Men**: Utilize podcasts, Twitter/X, and YouTube as these are trusted sources for political news among this demographic.\n- **For Young Women**: Focus on TikTok, national and local TV news stations, and informational articles online.\n  \n### Canvassing and Outreach\n- **Door-to-Door Canvassing**: Engage young voters with a script that emphasizes the power of their vote and the candidate's commitment to public safety and youth empowerment.\n- **Phone Banking**: Use a concise script to gauge support and discuss key issues like public safety.\n- **Text Messaging**: Send targeted SMS messages to remind young voters of the importance of their vote and provide information on voting logistics.\n- **Digital Advertising**: Run ads on platforms like Facebook and Instagram with messages focused on public safety and the importance of voting.\n\n### Addressing Common Objections\n- **\"My vote doesn't matter\"**: Reinforce that young voters have the power to drive change on the issues that matter most to them.\n- **\"I'm not sure about safety policies\"**: Highlight the candidate's commitment to a comprehensive safety plan that addresses real community needs.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 42.06,
+    "error": null
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Program Cost in Virginia's 7th Congressional District for 2026\n\n## Overview\n\nOur campaign is considering the implementation of a canvassing program in Virginia's 7th Congressional District for the 2026 election cycle. This briefing outlines the estimated costs associated with such a program based on historical spending and industry averages.\n\n## Historical Spending and Budget Estimates\n\n- **Average Total Campaign Disbursement**: $1,341,459\n  - This figure is based on data from 21 candidates across two comparable election cycles (2018 and 2022).\n\n### Estimated Spending by Category\n\n- **Personnel**: $469,511\n- **Mail**: $268,292\n- **Digital**: $335,365\n- **Phones**: $134,146\n- **Miscellaneous**: $134,146\n\n## Cost-Per-Contact Rates\n\nThe following rates are used to project the budget for our canvassing program:\n\n- **Door Knock**: $7.00 per door (average of 8 doors per hour)\n- **Phone Call**: $1.50 per call\n- **Text Message**: $0.05 per text\n- **Mail Piece**: $1.00 per piece plus a $500 flat design fee\n- **Digital**: $0.02 per impression with a $1,000 minimum per flight\n\n## Strategic Considerations\n\n- **Target Demographic**: Voters with inconsistent voting history\n- **Key Message**: A comprehensive \"serious about safety\" platform that resonates particularly well with Black voters and young voters.\n\n## Conclusion\n\nImplementing a canvassing program in Virginia's 7th Congressional District will require careful budgeting and strategic allocation of resources across various outreach methods. By leveraging historical data and industry averages, we can effectively plan and execute a program that maximizes voter engagement and turnout.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 42.66,
+    "error": null
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Program Briefing: Virginia's 7th Congressional District Win Number for 2026\n\n## Overview\nAs we strategize for the upcoming 2026 election cycle, it is crucial to understand the electoral dynamics of Virginia's 7th Congressional District. Our analysis focuses on the win number, projected turnout, and historical voting patterns to inform our campaign efforts.\n\n## Key Findings\n\n- **Win Number**: The win number for Virginia's 7th Congressional District in 2026 is projected to be **150,404** votes. This figure represents the minimum number of votes needed to secure a victory in the district.\n\n- **Projected Turnout**: The anticipated voter turnout for the district is **289,239**. This projection is based on historical data from previous midterm election cycles, specifically 2014, 2018, and 2022.\n\n- **Voter Universe**: The Citizen Voting Age Population (CVAP) for the district is estimated at **542,664**. This figure provides a broader context for understanding the potential voter base.\n\n- **Average Turnout Percentage**: Historically, the average turnout percentage for the district is approximately **53.3%**. This average is derived from the same midterm cycles used for turnout projections.\n\n- **Victory Margin**: The projected victory margin is **0.52%**, indicating a competitive race where every vote will be crucial.\n\n## Strategic Implications\n\n- **Targeted Outreach**: Given the competitive nature of the district, our campaign should prioritize targeted outreach to ensure we meet or exceed the win number of 150,404 votes.\n\n- **Voter Engagement**: With a projected turnout of 289,239, our efforts should focus on maximizing voter engagement and turnout, particularly among key demographic groups within the CVAP.\n\n- **Historical Context**: Understanding the historical context of previous election cycles will aid in refining our strategies to address any shifts in voter behavior or preferences.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 5.77,
+    "error": null
+  },
+  {
+    "provider": "llama",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Engaging Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with the highest concentrations of voters aged 18-34. The following precincts have been identified as key targets due to their significant youth voter populations:\n\n- **Trevvett** (Youth VAP: 1,942.73)\n- **Tucker** (Youth VAP: 1,914.09)\n- **Drewrys Bluff** (Youth VAP: 1,826.16)\n- **Five Forks** (Youth VAP: 1,749.47)\n- **Azalea** (Youth VAP: 1,703.58)\n- **Hermitage** (Youth VAP: 1,647.49)\n- **Longan** (Youth VAP: 1,553.87)\n- **Chippenham** (Youth VAP: 1,465.20)\n- **John J. Wright** (Youth VAP: 1,456.81)\n\nThese precincts are prioritized based on their youth voter population, which is crucial for maximizing our outreach efforts.\n\n## Messaging Strategy\n\nTo engage young voters effectively, our messaging should focus on empowering them to influence change on issues that matter most to them. Based on recent findings, the following key messages and strategies should be employed:\n\n- **Empowerment and Influence**: Emphasize the power of young voters to drive change in their community. Highlight how their participation can influence critical issues like public safety and community well-being.\n  \n- **\"Serious About Safety\" Platform**: Promote a comprehensive approach to public safety that resonates with young and diverse voters. This includes preventing crime and responding to crises effectively, which has shown to align with the views of young voters.\n\n- **Media Consumption**: Tailor our media strategy to align with the preferred platforms of young voters. Young men are more likely to trust podcasts, Twitter/X, and YouTube, while young women prefer TikTok, national TV news, and informational articles online. Our campaign should leverage these platforms to disseminate our message effectively.\n\n- **Addressing Concerns**: Acknowledge and address common objections such as distrust in political news sources and the belief that their vote doesn't matter. Reinforce our campaign's commitment to transparency and the importance of their voice in the electoral process.\n\n## Implementation\n\n- **Canvassing and Phone Banking**: Utilize door-to-door canvassing and phone banking scripts that focus on empowering young voters and addressing their concerns. Ensure that canvassers and callers are well-versed in the \"serious about safety\" platform and can pivot conversations to address specific voter priorities.\n\n- **Digital and Social Media**: Deploy targeted digital ads on platforms like Facebook, Instagram, and YouTube, emphasizing the stakes of the election and the importance of young voter participation. Use high-contrast visuals and clear calls to action to engage this demographic.\n\n- **Text Messaging**: Implement a peer-to-peer texting campaign to reach young voters directly, providing them with information about voting and encouraging them to participate on Election Day.\n\nBy focusing on these targeted precincts and delivering a message that resonates with young voters, we can effectively engage this critical demographic and encourage their participation in the upcoming election.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 43.93,
+    "error": null
+  },
+  {
+    "provider": "llama",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Program Cost in Virginia's 7th Congressional District for 2026\n\n## Overview\n\nOur campaign aims to implement a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election cycle. This briefing outlines the estimated costs and strategic considerations based on historical data and recent research findings.\n\n## Cost Estimates\n\n### Total Campaign Disbursement\n- **Average Total Campaign Disbursement**: $1,341,459\n\n### Estimated Spending by Category\n- **Personnel**: $469,511\n- **Mail**: $268,292\n- **Digital**: $335,365\n- **Phones**: $134,146\n- **Miscellaneous**: $134,146\n\n### Per-Contact Rates\n- **Door Knock**: $7.00 per door (8 doors/hour average)\n- **Phone Call**: $1.50 per call\n- **Text Message**: $0.05 per text\n- **Mail Piece**: $1.00 per piece + $500 flat design fee\n- **Digital**: $0.02 per impression ($1,000 minimum per flight)\n\n## Strategic Considerations\n\n### Target Demographics\n- Focus on voters with inconsistent voting histories.\n- Emphasize a comprehensive \"serious about safety\" platform which resonates particularly well with young and Black voters.\n\n### Messaging Strategy\n- Utilize a multi-channel approach including door-to-door canvassing, phone banking, text messaging, and digital ads.\n- Highlight issues of voter turnout and crime, which are top concerns for the community.\n\n### Historical Context\n- The district is rated as **Lean Democratic** with a Cook PVI of **D+6**.\n- The most recent election in 2022 had a total of 274,590 votes cast.\n\n### Projected Turnout\n- **Projected Turnout for 2026**: 289,239\n- **Win Number**: 150,404\n\n## Conclusion\n\nImplementing a canvassing program in Virginia's 7th Congressional District will require strategic allocation of resources across various outreach methods. The estimated cost for such a program is approximately $1.34 million, with significant investments in personnel, digital outreach, and direct voter contact methods. Our focus will remain on engaging voters with inconsistent voting patterns and addressing their key concerns to maximize turnout and support.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 40.36,
+    "error": null
+  },
+  {
+    "provider": "llama",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Virginia's 7th Congressional District: 2026 Win Number Briefing\n\n## Overview\n\nIn preparation for the 2026 election cycle, our campaign has focused on understanding the win number necessary to secure victory in Virginia's 7th Congressional District. This briefing outlines the key metrics and projections that will guide our strategic planning.\n\n## Key Metrics\n\n- **Win Number**: The projected win number for Virginia's 7th Congressional District in 2026 is **150,404** votes. This figure represents the minimum number of votes required to secure a majority in the upcoming election.\n  \n- **Projected Turnout**: We anticipate a voter turnout of **289,239** individuals. This projection is based on historical data from previous midterm elections in 2014, 2018, and 2022.\n\n- **Voter Universe**: The voter universe, defined as the Citizen Voting Age Population (CVAP), is estimated at **542,664**. This figure provides the total pool of potential voters in the district.\n\n- **Average Turnout Percentage**: Historically, the average turnout percentage for this district has been **53.3%**. This percentage reflects the proportion of the voter universe that is expected to participate in the election.\n\n- **Victory Margin**: The projected victory margin is **0.52%**, indicating a competitive race where every vote will be crucial.\n\n## Historical Context\n\nThe projections are informed by an analysis of past electoral cycles, specifically the midterm elections of 2014, 2018, and 2022. These cycles provide a contextual basis for understanding voter behavior and turnout trends in the district.\n\n## Strategic Implications\n\n- **Focus on Turnout**: Given the competitive nature of the district, our campaign must prioritize efforts to maximize voter turnout, particularly among our core supporters.\n\n- **Targeted Outreach**: With a clear understanding of the voter universe, we should implement targeted outreach strategies to engage and mobilize undecided and infrequent voters.\n\n- **Resource Allocation**: The projected win number and turnout figures will guide our resource allocation, ensuring that campaign efforts are effectively directed towards achieving the necessary vote count.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 6.04,
+    "error": null
+  },
+  {
+    "provider": "mistral",
+    "model": "mistral-large-latest",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Targeting Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with the highest concentrations of young voters aged 18-34. Based on our analysis, the following precincts are prioritized due to their significant youth voting-age population (youth VAP):\n\n- **Trevvett**: 1,942.73 youth VAP\n- **51087-315-Tucker**: 1,914.09 youth VAP\n- **Drewrys Bluff**: 1,826.16 youth VAP\n- **Five Forks**: 1,749.47 youth VAP\n- **Azalea**: 1,703.58 youth VAP\n- **Hermitage**: 1,647.49 youth VAP\n- **Longan**: 1,553.87 youth VAP\n- **Chippenham**: 1,465.20 youth VAP\n- **- JOHN J. WRIGHT**: 1,456.81 youth VAP\n- **Clover Hill**: 1,295.04 youth VAP\n\nThese precincts show a high concentration of young voters, making them ideal targets for our outreach efforts.\n\n## Messaging Strategy\n\nOur messaging should focus on empowering young voters by addressing issues that resonate with them, particularly public safety and media trust. The following key messages and strategies should be employed:\n\n- **Empowerment and Impact**: Emphasize the power of young voters to make impactful changes on issues that matter to them. Highlight the importance of their participation in shaping policies that affect their future.\n\n- **Public Safety**: Promote a comprehensive \"serious about safety\" platform that includes crime prevention and effective crisis response. This message resonates strongly with young voters and aligns with their priorities.\n\n- **Media Trust**: Acknowledge the diverse media consumption habits of young voters. Ensure that our campaign provides accurate and impactful information through trusted channels.\n\n- **Tailored Outreach**: Use different media platforms to reach young men and women effectively. For young men, focus on podcasts, Twitter/X, and YouTube. For young women, prioritize TikTok, national TV news, and online articles.\n\n## Communication Channels\n\n- **Door-to-Door Canvassing**: Engage young voters directly with a personal touch. Use a script that highlights the candidate's commitment to safety and youth engagement.\n\n- **Phone Banking**: Connect with young voters to discuss their concerns and the candidate's stance on key issues. Ensure calls are concise and respectful of the voter's time.\n\n- **Text Messaging**: Utilize peer-to-peer texting to reach young voters quickly and efficiently. Keep messages short, informative, and include an opt-out option.\n\n- **Digital Advertising**: Run targeted ads on platforms like Facebook and Instagram to reach young voters where they are most active. Use high-contrast visuals and clear calls to action.\n\n## Conclusion\n\nBy focusing on these targeted precincts and delivering a message that resonates with young voters, we can effectively engage this demographic and encourage their participation in the upcoming election. Our strategy leverages both traditional and digital communication channels to maximize outreach and impact.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 39.5,
+    "error": null
+  },
+  {
+    "provider": "mistral",
+    "model": "mistral-large-latest",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Cost Estimate for Virginia's 7th Congressional District in 2026\n\n## Overview\n\nOur campaign is considering implementing a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election. This briefing provides an estimate of the costs associated with running such a program based on historical spending data and current cost-per-contact rates.\n\n## Historical Spending and Cost Estimates\n\nThe average total campaign disbursement for comparable Congressional races in this district, based on data from the 2018 and 2022 election cycles, was approximately **$1,341,459**. This figure provides a baseline for understanding the financial scope of a full campaign effort, including canvassing.\n\n### Estimated Spending by Category\n\n- **Personnel:** $469,511\n- **Mail:** $268,292\n- **Digital:** $335,365\n- **Phones:** $134,146\n- **Miscellaneous:** $134,146\n\n### Per-Contact Rates\n\nThe following cost-per-contact rates are used for budget projections:\n\n- **Door Knock:** $7.00 per door (average of 8 doors per hour)\n- **Phone Call:** $1.50 per call\n- **Text Message:** $0.05 per text\n- **Mail Piece:** $1.00 per piece plus a $500 flat design fee\n- **Digital Advertising:** $0.02 per impression (with a $1,000 minimum per flight)\n\n## Canvassing Program Focus\n\nOur canvassing efforts will primarily target voters with inconsistent voting histories, as research indicates that canvassing can have a positive impact on turnout among this demographic. The messaging will focus on:\n\n- **Crime and Safety:** Emphasizing a comprehensive \"serious about safety\" platform that resonates particularly well with Black and young voters.\n- **Voter Turnout:** Encouraging participation by highlighting the importance of each vote in contributing to community safety and change.\n\n## Conclusion\n\nImplementing a canvassing program in Virginia's 7th Congressional District will require careful financial planning and strategic targeting to maximize voter engagement and turnout. By leveraging historical spending data and current cost-per-contact rates, we can effectively allocate resources to achieve our campaign goals.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 41.15,
+    "error": null
+  },
+  {
+    "provider": "mistral",
+    "model": "mistral-large-latest",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "## Program Briefing: Virginia's 7th Congressional District Win Number for 2026\n\nIn our strategic planning for the 2026 midterm elections, understanding the win number for Virginia's 7th Congressional District is crucial. Based on the most recent and specific data available, here is the synthesized information:\n\n- **Win Number**: The win number for Virginia's 7th Congressional District in 2026 is projected to be **150,404** votes.\n  \n- **Projected Turnout**: The anticipated voter turnout for the district is **289,239**. This projection is based on historical turnout data from previous midterm election cycles, specifically 2014, 2018, and 2022.\n\n- **Voter Universe**: The Citizen Voting Age Population (CVAP) for the district is estimated at **542,664**.\n\n- **Average Turnout Percentage**: The average turnout percentage for the district, derived from past midterm cycles, is **53.3%**.\n\n- **Victory Margin**: A narrow victory margin of **0.52%** is expected, indicating a highly competitive race.\n\n- **Historical Context**: The projections are based on an analysis of voter behavior and turnout patterns from the 2014, 2018, and 2022 midterm elections.\n\nThis data will guide our campaign strategy as we aim to secure a victory in this pivotal district. By focusing on mobilizing our base and reaching out to undecided voters, we can achieve the necessary win number to succeed.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 5.59,
+    "error": null
+  },
+  {
+    "provider": "cohere",
+    "model": "command-r-plus",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Engaging Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus on precincts with high concentrations of voters aged 18-34. The following precincts have been identified as priorities based on their youth voter population:\n\n- **Trevvett (Precinct Geoid: 51087-111-Maude Trevvett)**\n- **Tucker (Precinct Geoid: 51087-315-Tucker)**\n- **Drewrys Bluff (Precinct Geoid: 51041-105-DrewrysBluff)**\n- **Five Forks (Precinct Geoid: 51041-210-FiveForks)**\n- **Azalea (Precinct Geoid: 51087-201-Azalea)**\n- **Hermitage (Precinct Geoid: 51087-105-Hermitage)**\n- **Longan (Precinct Geoid: 51087-110-Longan)**\n- **Chippenham (Precinct Geoid: 51041-207-Chippenham)**\n- **John J. Wright (Precinct Geoid: 51177-103 - JOHN J. WRIGHT)**\n- **Clover Hill (Precinct Geoid: 51041-412-CloverHill)**\n\nThese precincts have been selected due to their significant youth voter population, which provides an opportunity to engage and mobilize young voters effectively.\n\n## Messaging Strategy\n\nOur messaging should focus on empowering young voters and addressing issues that resonate with them. Based on recent findings, the following key messages should be delivered:\n\n- **Empowerment and Change:** Emphasize the power of young voters to create meaningful change on issues that matter to them. Highlight the importance of their participation in shaping the future.\n  \n- **Public Safety:** Communicate Candidate X's commitment to a comprehensive 'serious about safety' platform. This approach focuses on preventing crime and responding effectively to crises, resonating strongly with young voters.\n\n- **Media Consumption:** Tailor messages to align with the media consumption habits of young voters. Use platforms like TikTok, national TV news, and online articles for young women, and podcasts, Twitter/X, and YouTube for young men.\n\n- **Vote Power:** Reinforce the message that their vote is crucial in making a difference, especially on issues like public safety, which are top concerns in the district.\n\n## Communication Channels\n\nTo effectively reach young voters, we should utilize a mix of communication channels:\n\n- **Digital Advertising:** Use platforms like Facebook, Instagram, and display ads to reach young voters where they spend their time online. A/B test different ad variations to optimize engagement.\n\n- **Peer-to-Peer Texting:** Engage young voters directly through personalized SMS outreach, ensuring messages are concise and include an opt-out option.\n\n- **Door-to-Door Canvassing:** Conduct face-to-face interactions in targeted precincts, emphasizing the importance of their vote and addressing any concerns they may have.\n\n- **Phone Banking:** Reach out to young voters through phone calls, providing information on Candidate X's platform and encouraging them to make a voting plan.\n\nBy focusing on these targeted precincts and delivering a message that resonates with young voters, we can effectively engage and mobilize this critical demographic in Virginia's 7th Congressional District.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 35.98,
+    "error": null
+  },
+  {
+    "provider": "cohere",
+    "model": "command-r-plus",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Program Cost in Virginia's 7th Congressional District for 2026\n\n## Overview\n\nOur campaign is evaluating the costs associated with running a canvassing program in Virginia's 7th Congressional District for the 2026 election cycle. This briefing synthesizes the latest research findings and cost estimates to provide a comprehensive understanding of the financial requirements.\n\n## Key Findings\n\n- **Historical Spending**: The average total campaign disbursement for similar races in the district was approximately **$1,341,459**. This figure is based on data from 21 candidates across two comparable election cycles (2018 and 2022).\n\n- **Projected Turnout**: The projected voter turnout for 2026 is estimated at **289,239** with a win number of **150,404** votes needed for victory.\n\n- **Cost Estimates by Category**:\n  - **Personnel**: $469,511\n  - **Mail**: $268,292\n  - **Digital**: $335,365\n  - **Phones**: $134,146\n  - **Miscellaneous**: $134,146\n\n## Canvassing Program Specifics\n\n- **Door Knocking**: \n  - **Cost per Door**: $7.00\n  - **Average Doors per Hour**: 8\n\n- **Phone Calls**: \n  - **Cost per Call**: $1.50\n\n- **Text Messaging**: \n  - **Cost per Text**: $0.05\n\n- **Mail**: \n  - **Cost per Piece**: $1.00\n  - **Design Fee**: $500 flat fee\n\n- **Digital Advertising**: \n  - **Cost per Impression**: $0.02\n  - **Minimum Spend per Flight**: $1,000\n\n## Strategic Considerations\n\n- **Target Demographic**: Focus on voters with inconsistent voting histories, as canvassing has shown positive effects on turnout among this group.\n  \n- **Messaging**: Emphasize a comprehensive \"serious about safety\" platform, which has resonated well with Black voters and young voters in previous cycles.\n\n- **Precincts**: There are 295 precincts in the district, with a focus on those with the highest total voting-age population for maximum impact.\n\n## Conclusion\n\nThe estimated cost to run a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election cycle is aligned with historical spending patterns, with a total budget of approximately **$1,341,459**. This includes personnel, mail, digital, phone, and miscellaneous expenses. Our strategy will focus on engaging voters with inconsistent voting histories and leveraging effective messaging to maximize turnout.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 39.1,
+    "error": null
+  },
+  {
+    "provider": "cohere",
+    "model": "command-r-plus",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Virginia's 7th Congressional District Win Number for 2026\n\n## Overview\n\nIn preparation for the 2026 midterm elections, our campaign has analyzed the necessary win number for Virginia's 7th Congressional District. This analysis is crucial for strategizing our voter outreach and resource allocation effectively.\n\n## Key Findings\n\n- **Win Number**: The projected win number for Virginia's 7th Congressional District in 2026 is **150,404** votes.\n- **Projected Turnout**: The expected voter turnout is **289,239**, based on historical data from previous midterm election cycles.\n- **Voter Universe**: The total citizen voting-age population (CVAP) in the district is **542,664**.\n- **Average Turnout Percentage**: The average turnout percentage for the district is approximately **53.3%**.\n- **Victory Margin**: A narrow victory margin of **0.52%** is anticipated, emphasizing the importance of every vote.\n\n## Historical Context\n\n- The projections are based on an analysis of midterm election cycles from **2014, 2018, and 2022**.\n- These historical cycles provide a reliable foundation for understanding voter behavior and turnout trends in the district.\n\n## Strategic Implications\n\n- **Resource Allocation**: Given the narrow victory margin, it is imperative to focus resources on maximizing voter engagement and turnout.\n- **Voter Outreach**: Targeted outreach efforts should be intensified to ensure we meet or exceed the projected win number.\n- **Data-Driven Decisions**: Continual monitoring of voter registration and engagement metrics will be crucial to adjust strategies as needed.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 6.57,
+    "error": null
+  },
+  {
+    "provider": "groq",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "young_voters",
+    "query_label": "Q1: Young voter targeting + messaging",
+    "final_answer": "# Program Briefing: Engaging Young Voters in Virginia's 7th Congressional District\n\n## Target Precincts\n\nTo effectively reach young voters in Virginia's 7th Congressional District, we should focus our efforts on precincts with the highest concentrations of young voters aged 18-34. The following precincts have been identified as key targets based on their youth voter population:\n\n- **Trevvett**: Youth VAP of 1,942.73\n- **51087-315-Tucker**: Youth VAP of 1,914.09\n- **51041-105-DrewrysBluff**: Youth VAP of 1,826.16\n- **51041-210-FiveForks**: Youth VAP of 1,749.47\n- **51087-201-Azalea**: Youth VAP of 1,703.58\n- **51087-105-Hermitage**: Youth VAP of 1,647.49\n- **51087-110-Longan**: Youth VAP of 1,553.87\n- **51041-207-Chippenham**: Youth VAP of 1,465.20\n- **51177-103 - JOHN J. WRIGHT**: Youth VAP of 1,456.81\n- **51041-412-CloverHill**: Youth VAP of 1,295.04\n\nThese precincts should be prioritized for outreach efforts due to their significant populations of young voters.\n\n## Messaging Strategy\n\n**Key Message:** Empowering young voices to shape their future.\n\n### Messaging Themes\n- **Informed Media Consumption**: Emphasize the importance of accessing reliable news sources to empower informed decision-making.\n- **Public Safety**: Promote a comprehensive \"serious about safety\" platform that addresses prevention and response, resonating with young and Black voters.\n\n### Media Behavior Insights\n- **Young Men**: More likely to trust podcasts, Twitter/X, and YouTube.\n- **Young Women**: Prefer TikTok, national and local TV news, and informational articles online.\n\n### Messaging Channels\n- **Digital Ads**: Utilize platforms like Facebook, Instagram, and display ads to reach young voters where they are most active.\n- **Canvassing and Phone Banking**: Engage directly with voters through door-to-door canvassing and phone calls, emphasizing the importance of their vote.\n- **Text Messaging**: Use peer-to-peer texting to provide concise, impactful messages and reminders about voting.\n\n### Sample Messaging\n- **Canvassing/Phone Banking**: \"Candidate Name is committed to promoting informed media consumption and a balanced approach to safety. Can we count on your support?\"\n- **Digital Ads**: \"Safety and Media Matter in 5107. Candidate Name is fighting for informed media and safety. Join us on Election Day.\"\n- **Text Messaging**: \"Hi [NAME]! I'm [CALLER], volunteering for Candidate Name in Congressional 5107. Can we count on your vote on Election Day? Reply STOP to opt out.\"\n\n## Conclusion\n\nBy targeting the identified precincts and delivering a message that resonates with young voters' priorities, our campaign can effectively engage and mobilize this critical demographic.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 40.21,
+    "error": null
+  },
+  {
+    "provider": "groq",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "canvassing_cost",
+    "query_label": "Q2: Canvassing cost estimate",
+    "final_answer": "# Program Briefing: Canvassing Cost Estimate for Virginia's 7th Congressional District in 2026\n\n## Overview\n\nOur campaign is considering a comprehensive canvassing program in Virginia's 7th Congressional District for the 2026 election. This briefing outlines the estimated costs and strategic considerations based on historical data and recent research findings.\n\n## Estimated Costs\n\nThe cost estimates for running a canvassing program are derived from historical spending data and industry averages for Congressional races. The following are the key components of the budget:\n\n- **Door Knocking:**\n  - **Cost per Door Knock:** $7.00\n  - **Average Doors per Hour:** 8\n  - This cost includes the personnel expenses associated with canvassing efforts.\n\n- **Total Program Estimate:**\n  - **Total Estimated Cost:** $1,341,459\n  - **Breakdown by Category:**\n    - **Personnel:** $469,511\n    - **Mail:** $268,292\n    - **Digital:** $335,365\n    - **Phones:** $134,146\n    - **Miscellaneous:** $134,146\n\n## Strategic Considerations\n\n- **Target Demographic:** The canvassing efforts will focus on voters with inconsistent voting histories, as these individuals are more likely to be influenced by direct engagement.\n  \n- **Messaging Strategy:** \n  - Emphasize a comprehensive safety plan that addresses crime and resonates with key demographics, including Black and young voters.\n  - Utilize a \"serious about safety\" platform that has shown positive reception in previous studies.\n\n- **Historical Context:**\n  - The district has a Cook Political Report PVI of D+6, indicating a lean Democratic advantage.\n  - The projected turnout for 2026 is estimated at 289,239 voters, with a win number of 150,404.\n\n## Conclusion\n\nImplementing a canvassing program in Virginia's 7th Congressional District requires a significant investment, with personnel and direct voter contact being the primary cost drivers. The strategic focus on engaging voters with inconsistent voting histories and addressing key issues like safety will be crucial to maximizing the impact of our canvassing efforts.\n\n*Research sourced from materials dated as recently as 2022.*",
+    "active_agents": [
+      "researcher",
+      "election_results",
+      "win_number",
+      "precincts",
+      "messaging",
+      "cost_calculator"
+    ],
+    "pipeline_errors": [
+      "ElectionAnalyst: MEDSL party-level data unavailable \u2014 margin trend and D/R vote shares cannot be computed. Turnout data from master CSV will still be used."
+    ],
+    "pipeline_time_s": 44.92,
+    "error": null
+  },
+  {
+    "provider": "groq",
+    "model": "llama-3.1-70b-versatile",
+    "query_id": "win_number",
+    "query_label": "Q3: Win number",
+    "final_answer": "# Virginia's 7th Congressional District: 2026 Win Number Briefing\n\n## Overview\n\nAs we strategize for the upcoming 2026 election cycle, understanding the win number for Virginia's 7th Congressional District is crucial. This figure represents the minimum number of votes needed to secure victory in the district.\n\n## Key Findings\n\n- **Win Number**: The projected win number for Virginia's 7th Congressional District in 2026 is **150,404** votes.\n  \n- **Projected Turnout**: The anticipated voter turnout for the district is **289,239**. This projection is based on historical data from previous midterm election cycles, specifically 2014, 2018, and 2022.\n\n- **Voter Universe**: The total voter universe, or Citizen Voting Age Population (CVAP), in the district is **542,664**.\n\n- **Average Turnout Percentage**: Historically, the average turnout percentage for midterm elections in this district has been approximately **53.3%**.\n\n- **Victory Margin**: The expected victory margin is narrow, at **0.52%**, indicating a highly competitive race.\n\n## Strategic Implications\n\n- **Targeted Outreach**: Given the competitive nature of the district, our campaign must focus on targeted outreach to ensure we meet or exceed the win number.\n  \n- **Resource Allocation**: With a projected turnout of 289,239, efficient allocation of resources towards voter mobilization efforts will be essential to secure the necessary votes.\n\n- **Historical Context**: Our strategy should consider trends and patterns from the 2014, 2018, and 2022 midterm elections to anticipate voter behavior and adjust our approach accordingly.\n\n*Research sourced from materials dated as recently as unknown.*",
+    "active_agents": [
+      "win_number"
+    ],
+    "pipeline_errors": [],
+    "pipeline_time_s": 5.63,
+    "error": null
+  }
+]

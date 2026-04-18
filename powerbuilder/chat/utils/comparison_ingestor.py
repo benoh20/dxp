@@ -280,6 +280,18 @@ def ingest_provider(
         result["status"] = "dry_run"
         return result
 
+    # --force: delete all existing vectors in the namespace before upserting so
+    # repeated runs don't accumulate duplicate vectors.  delete_all operates on
+    # one namespace at a time; passing namespace="" clears the default namespace.
+    if force:
+        existing = _count_vectors(pc, target_index, namespace=SOURCE_NAMESPACE)
+        if existing > 0:
+            print(f"  --force: deleting {existing} existing vectors from "
+                  f"'{target_index}' namespace='{SOURCE_NAMESPACE or '(default)'}'...",
+                  flush=True)
+            pc.Index(target_index).delete(delete_all=True, namespace=SOURCE_NAMESPACE)
+            print(f"  Namespace cleared.")
+
     # Smoke test — embed one chunk and verify dimensions before committing to the
     # full batch.  This catches model-name 404s and dimension mismatches early.
     print(f"  Smoke test: embedding 1 chunk with '{emb_cfg.model}'...", flush=True)
