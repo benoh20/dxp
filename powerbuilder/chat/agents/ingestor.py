@@ -1,6 +1,7 @@
 import os
 import re
-from datetime import date as _today
+import shutil
+from datetime import date as _today, datetime as _datetime, timezone as _tz
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -107,26 +108,42 @@ def ingestor_node(state: AgentState):
     org_namespace = state.get("org_namespace")
     filename      = os.path.basename(file_path) if file_path else ""
 
-    # 'general' is the shared read-only namespace for unaffiliated users.
-    # Writing to it is blocked so one user cannot pollute the shared index.
-    # Authenticated org members write to their own isolated namespace.
-    if org_namespace == "general":
-        return {
-            "research_results": [
-                "Document upload is not available for guest users. "
-                "Please register with your organisation email to upload research."
-            ],
-            "active_agents": ["ingestor"],
-        }
-
     if not file_path or not os.path.exists(file_path):
-        return {"research_results": ["Error: File path not found."]}
+        return {"research_results": ["Error: File path not found."],
+                "active_agents": ["ingestor"]}
 
     file_ext = os.path.splitext(file_path)[1].lower()
 
-    # for unstructured data
-    if file_ext in [".pdf", ".docx"]:
-        # parse document
+    # ------------------------------------------------------------------
+    # ROUTING DECISION — why these two paths are strictly separate:
+    #
+    # PDF / DOCX  →  LlamaParse → OpenAI embeddings → Pinecone
+    #   Unstructured research documents become searchable vector chunks
+    #   scoped to the org's Pinecone namespace.  Writing to Pinecone is
+    #   restricted to authenticated org members (org_namespace != "general")
+    #   to prevent guest users from polluting the shared index.
+    #
+    # CSV / XLSX  →  data/uploads/{timestamp}_{filename} → VoterFileAgent
+    #   Structured voter files contain PII and must NEVER be sent to
+    #   Pinecone.  They are copied to a stable local path so VoterFileAgent
+    #   can read them reliably (Django's temp upload path may be cleaned up
+    #   before the agent runs).  The file is discarded after analysis;
+    #   nothing is written to the vector database.
+    # ------------------------------------------------------------------
+
+    if file_ext in (".pdf", ".docx"):
+        # Pinecone writes are restricted to authenticated org namespaces.
+        # 'general' is shared and read-only to prevent cross-org pollution.
+        if org_namespace == "general":
+            return {
+                "research_results": [
+                    "Document upload is not available for guest users. "
+                    "Please register with your organisation email to upload research."
+                ],
+                "active_agents": ["ingestor"],
+            }
+
+        # Parse unstructured document
         llama_docs = parser.load_data(file_path)
 
         # Extract date and document_type from the first chunk's text.
@@ -135,10 +152,9 @@ def ingestor_node(state: AgentState):
         first_text   = llama_docs[0].text if llama_docs else ""
         doc_metadata = extract_doc_metadata(first_text, llm, filename=filename)
 
-        # translate to LangChain Documents
         langchain_docs = []
         for doc in llama_docs:
-            clean_doc = LCDocument(
+            langchain_docs.append(LCDocument(
                 page_content=doc.text,
                 metadata={
                     "source":   filename,
@@ -146,16 +162,13 @@ def ingestor_node(state: AgentState):
                     "text":     doc.text,
                     **doc_metadata,
                 }
-            )
-            langchain_docs.append(clean_doc)
+            ))
 
-        # prepare embeddings
         embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small",
             openai_api_key=os.environ.get("OPENAI_API_KEY"),
         )
 
-        # upsert to Pinecone in org-specific namespace
         PineconeVectorStore.from_documents(
             documents=langchain_docs,
             embedding=embeddings,
@@ -172,11 +185,24 @@ def ingestor_node(state: AgentState):
             "active_agents": ["ingestor"],
         }
 
-    # for structured voter files (.csv or .xlsx) — pass through to VoterFileAgent.
-    # The file path remains in state so VoterFileAgent can read it directly.
-    # Raw voter data is not persisted here; VoterFileAgent discards it after analysis.
-    elif file_ext in (".csv", ".xlsx", ".xls"):
+    if file_ext in (".csv", ".xlsx", ".xls"):
+        # Copy to a stable local path before handing off to VoterFileAgent.
+        # Django's temp upload path is not guaranteed to survive until the
+        # agent runs, so we persist the file ourselves with a timestamp prefix
+        # to avoid collisions when the same filename is uploaded more than once.
+        uploads_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "uploads",
+        )
+        os.makedirs(uploads_dir, exist_ok=True)
+
+        timestamp   = _datetime.now(_tz.utc).strftime("%Y%m%d_%H%M%S_%f")
+        stable_name = f"{timestamp}_{filename}"
+        stable_path = os.path.join(uploads_dir, stable_name)
+        shutil.copy2(file_path, stable_path)
+
         return {
+            "uploaded_file_path": stable_path,
             "research_results": [
                 f"Voter file {filename} received. Routing to voter file analyst."
             ],

@@ -569,10 +569,10 @@ class VoterFileAgent:
 
         return {
             "structured_data": [{
-                "agent":    "voter_file",
-                "vendor":   vendor,
-                "summary":  summary,
-                "segments": segments,
+                "agent":            "voter_file",
+                "vendor_detected":  vendor,
+                "summary":          summary,
+                "segments":         segments,
             }],
             "research_results": messaging_memos,
             "active_agents":    ["voter_file"],
