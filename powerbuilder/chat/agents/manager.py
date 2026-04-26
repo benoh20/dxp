@@ -24,41 +24,46 @@ def get_model():
 
 def _detect_demographic_intent(query: str) -> str:
     """
-    Keyword scan that maps a user query to a demographic intent label.
-    Used by intent_router_node to set AgentState.demographic_intent so
-    PrecinctsAgent can select the correct targeting metric without an extra
-    LLM call. Order matters: more specific checks precede broader ones.
+    Keyword scan that returns one or more demographic intent labels joined by "+".
+    All matching intents are collected (e.g. "black+hispanic" for combined queries).
+    Returns "default" when no specific demographic is detected.
     """
     q = query.lower()
-    if any(kw in q for kw in ("young voter", "youth", "student", "college", "millennial", "gen z", "young people")):
-        return "youth"
+    matches: list = []
+
+    # "college student" for youth; plain "college" omitted to avoid conflict with "college educated"
+    if any(kw in q for kw in ("young voter", "youth", "student", "college student", "millennial", "gen z", "young people")):
+        matches.append("youth")
     if any(kw in q for kw in ("hispanic", "latino", "latina", "latinx", "spanish-speaking", "spanish speaking")):
-        return "hispanic"
+        matches.append("hispanic")
     if any(kw in q for kw in ("black voter", "black voters", "african american", "hbcu")):
-        return "black"
+        matches.append("black")
     if any(kw in q for kw in ("asian", "aapi", "asian american", "pacific islander", "korean", "chinese", "vietnamese", "filipino", "japanese", "south asian", "indian american")):
-        return "aapi"
+        matches.append("aapi")
     if any(kw in q for kw in ("native american", "indigenous", "tribal", "american indian", "alaska native")):
-        return "native"
+        matches.append("native")
     if any(kw in q for kw in ("senior", "elderly", "older voter", "retiree", "65 plus", "65+", "aarp")):
-        return "senior"
+        matches.append("senior")
     if any(kw in q for kw in ("college educated", "educated voter", "degree holder", "professional class")):
-        return "educated"
+        matches.append("educated")
     if any(kw in q for kw in ("working class", "blue collar", "no college", "trade worker", "union")):
-        return "working_class"
+        matches.append("working_class")
     if any(kw in q for kw in ("low income", "poverty", "poor", "economically disadvantaged", "public housing")):
-        return "low_income"
+        matches.append("low_income")
     if any(kw in q for kw in ("high income", "wealthy", "affluent", "upper income", "high earner")):
-        return "high_income"
+        matches.append("high_income")
     if any(kw in q for kw in ("immigrant", "foreign born", "foreign-born", "naturalized", "new american", "refugee")):
-        return "immigrant"
+        matches.append("immigrant")
     if any(kw in q for kw in ("veteran", "military", "armed forces", "service member", "former military")):
-        return "veteran"
+        matches.append("veteran")
     if any(kw in q for kw in ("suburban", "suburbs", "homeowner", "owner-occupied", "single family")):
-        return "suburban"
+        matches.append("suburban")
     if any(kw in q for kw in ("renter", "apartment", "urban renter", "tenant")):
-        return "renter"
-    return "default"
+        matches.append("renter")
+
+    if not matches:
+        return "default"
+    return "+".join(matches)
 
 # Keyword-based fast path for voter file queries — avoids an LLM call for clear cases.
 _VOTER_FILE_KEYWORDS = (

@@ -403,9 +403,9 @@
                 </div>
                 {% endif %}
 
-                {% if msg.download_filename %}
+                {% if msg.generated_file_path %}
                 <div>
-                  <a href="/download/{{ msg.download_filename }}/" class="btn-download">
+                  <a href="/download/{{ msg.generated_filename }}/" class="btn-download">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                       <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -430,9 +430,7 @@
             ">
               <svg width="26" height="26" viewBox="0 0 20 20" fill="none">
                 <rect width="20" height="20" rx="5" fill="var(--accent)"/>
-                <path d="M5 14V6h4.5a2.5 2.5 0 0 1 0 5H5m0-5v5m0 0v3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M11 14l3-8 3 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 11.5h4" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M7 16.5V3.5a5.5 4 0 0 1 0 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
             <h2>What can I help you win?</h2>
@@ -566,6 +564,9 @@
     document.getElementById('file-badge').style.display = 'none';
   };
 
+  /* ── Saved query — injected into HTMX request after form serialization ── */
+  let _pendingQuery = '';
+
   /* ── Form submit — validation + immediate user bubble ──────────── */
   document.getElementById('chat-form').addEventListener('submit', function (e) {
     const query = textarea.value.trim();
@@ -574,6 +575,10 @@
       textarea.focus();
       return;
     }
+
+    // Save before clearing — HTMX reads from textarea at document-level (after us),
+    // so it would see '' if we clear here. We inject the real value in configRequest.
+    _pendingQuery = query;
 
     // Remove empty-state placeholder once we start chatting
     const emptyState = document.getElementById('empty-state');
@@ -589,16 +594,29 @@
     // Show typing indicator
     document.getElementById('typing-indicator').style.display = 'block';
 
-    // Reset textarea
+    // Reset textarea (HTMX will get the value from _pendingQuery via configRequest)
     textarea.value = '';
     textarea.style.height = 'auto';
 
     scrollToBottom();
   });
 
+  /* ── Inject saved query into request params (fires after form serialization) ── */
+  htmx.on('htmx:configRequest', function (evt) {
+    if (evt.detail.elt && evt.detail.elt.id === 'chat-form' && _pendingQuery) {
+      const params = evt.detail.parameters;
+      if (params instanceof FormData) {
+        params.set('query', _pendingQuery);
+      } else {
+        params['query'] = _pendingQuery;
+      }
+    }
+  });
+
   /* ── After HTMX swaps the response ────────────────────────────── */
   htmx.on('htmx:afterSwap', function (evt) {
     if (evt.detail.target.id === 'messages') {
+      _pendingQuery = '';
       document.getElementById('typing-indicator').style.display = 'none';
       clearFile();
       scrollToBottom();
@@ -608,6 +626,7 @@
   /* ── On HTMX error (network failure, 5xx) ─────────────────────── */
   htmx.on('htmx:responseError', function (evt) {
     if (evt.detail.target.id === 'messages') {
+      _pendingQuery = '';
       document.getElementById('typing-indicator').style.display = 'none';
 
       const messages = document.getElementById('messages');

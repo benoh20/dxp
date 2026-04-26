@@ -1,6 +1,7 @@
 # Web Framework
 django>=5.0.0
 django-environ==0.11.2  # For managing .env variables
+django-htmx>=0.3.0     # For HTMX integration in Django templates
 
 # AI Orchestration & State
 langgraph>=0.2.0        # The Orchestrator engine

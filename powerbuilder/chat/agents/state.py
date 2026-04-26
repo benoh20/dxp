@@ -22,11 +22,7 @@ class AgentState(TypedDict):
     # -- Routing and Logic --
     router_decision: str # this holds the intent
     output_format: Literal["markdown", "csv", "text", "docx", "xlsx"] # define target file type
-    demographic_intent: Optional[Literal[
-        "youth", "hispanic", "black", "aapi", "native", "senior",
-        "educated", "working_class", "low_income", "high_income",
-        "immigrant", "veteran", "suburban", "renter", "default",
-    ]]  # set by intent_router via keyword scan of the query
+    demographic_intent: Optional[str]  # set by intent_router via keyword scan; "a+b" for combined demographics
 
     # -- File Handling --
     uploaded_file_path: Optional[str] # path to new file for ingesting

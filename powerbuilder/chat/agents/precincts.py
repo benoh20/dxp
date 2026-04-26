@@ -316,6 +316,7 @@ class PrecinctsAgent:
         district_type: str = "congressional",
         metrics: List[str] = None,
         top_n: int = 20,
+        combined_primary_metrics: List[str] = None,
     ) -> list:
         """
         Returns the top N precincts ranked by the first metric in the list.
@@ -340,6 +341,11 @@ class PrecinctsAgent:
         """
         if metrics is None:
             metrics = ["total_vap"]
+
+        # Always include total_vap so every output row carries the full VAP denominator.
+        # Append rather than prepend so metrics[0] stays the caller's primary sort metric.
+        if "total_vap" not in metrics:
+            metrics = list(metrics) + ["total_vap"]
 
         # Split into block-group-available metrics and tract-only education metrics.
         # B15003 (educational attainment) is not available at block group resolution
@@ -513,10 +519,29 @@ class PrecinctsAgent:
             else:
                 logger.warning("  Tract-level education weighting failed; education metrics will be absent from output.")
 
-        # 7. Rank by first metric and take top N
-        primary_col = f"weighted_{metrics[0]}"
-        if primary_col in precinct_totals.columns:
-            precinct_totals = precinct_totals.sort_values(primary_col, ascending=False)
+        # 6c. Combined targeting metric (multi-demographic queries).
+        # Sum the primary weighted column from each demographic group so the sort
+        # reflects the union of targets rather than either group alone.
+        if combined_primary_metrics:
+            avail_combined = [
+                f"weighted_{m}" for m in combined_primary_metrics
+                if f"weighted_{m}" in precinct_totals.columns
+            ]
+            if avail_combined:
+                precinct_totals["weighted_combined_target"] = precinct_totals[avail_combined].sum(axis=1)
+
+        use_combined_target = "weighted_combined_target" in precinct_totals.columns
+
+        # 7. Rank by combined target (multi-demo) or primary metric (single demo)
+        if use_combined_target:
+            sort_col = "weighted_combined_target"
+        elif f"weighted_{metrics[0]}" in precinct_totals.columns:
+            sort_col = f"weighted_{metrics[0]}"
+        else:
+            sort_col = None
+
+        if sort_col:
+            precinct_totals = precinct_totals.sort_values(sort_col, ascending=False)
 
         # Count total unique precincts in crosswalk before truncating to top_n.
         # Used for data quality check below.
@@ -531,10 +556,29 @@ class PrecinctsAgent:
                 "precinct_geoid": row["precinct_geoid"],
                 "precinct_name":  PrecinctsAgent._parse_precinct_name(row["precinct_geoid"]),
             }
+            # User-requested metrics (total_vap gets its own standardised key below)
             for metric in metrics:
+                if metric == "total_vap":
+                    continue
                 wcol = f"weighted_{metric}"
                 if wcol in row.index:
                     record[metric] = round(float(row[wcol]), 2)
+
+            # Always-present targeting columns
+            total_vap_val = float(row.get("weighted_total_vap", 0) or 0)
+            if use_combined_target:
+                target_val = float(row.get("weighted_combined_target", 0) or 0)
+            else:
+                target_val = float(row.get(f"weighted_{metrics[0]}", 0) or 0)
+
+            record["total_vap"]              = round(total_vap_val, 2)
+            record["target_demographic_vap"] = round(target_val, 2)
+            record["target_demographic_pct"] = (
+                round(target_val / total_vap_val * 100, 2) if total_vap_val > 0 else 0.0
+            )
+            record["penetration_rate"] = (
+                round(target_val / total_vap_val, 4) if total_vap_val > 0 else 0.0
+            )
             record["approximate_boundary"] = bool(row.get("approximate_boundary", False))
             results.append(record)
 
@@ -553,9 +597,10 @@ class PrecinctsAgent:
             )
 
         return {
-            "precincts":         results,
-            "precinct_count":    total_precinct_count,
-            "data_quality_note": data_quality_note,
+            "precincts":          results,
+            "precinct_count":     total_precinct_count,
+            "data_quality_note":  data_quality_note,
+            "tract_fallback_used": bool(edu_metrics),
         }
 
     # ------------------------------------------------------------------
@@ -614,9 +659,29 @@ TOP_N: [integer number of precincts to return, default 20]
         # Demographic intent is set by intent_router_node in manager.py via a keyword
         # scan of the query — no extra LLM call required. It overrides whatever METRICS
         # the LLM extracted, ensuring the targeting metric always matches the user's ask.
-        demographic_intent   = (state.get("demographic_intent") or "default").lower()
-        metrics              = _DEMOGRAPHIC_METRICS.get(demographic_intent, _DEMOGRAPHIC_METRICS["default"])
-        demographic_profile  = _DEMOGRAPHIC_PROFILES.get(demographic_intent, _DEMOGRAPHIC_PROFILES["default"])
+        # Combined intents (e.g. "black+hispanic") are joined with "+" and split here.
+        demographic_intent = (state.get("demographic_intent") or "default").lower()
+        intents = demographic_intent.split("+") if "+" in demographic_intent else [demographic_intent]
+
+        # Collect the union of metrics across all matched intents (order preserved, deduplicated)
+        metrics: list = []
+        combined_primary_metrics: list = []
+        for intent in intents:
+            intent_metrics = _DEMOGRAPHIC_METRICS.get(intent, _DEMOGRAPHIC_METRICS["default"])
+            primary = intent_metrics[0] if intent_metrics else None
+            if primary and primary not in combined_primary_metrics:
+                combined_primary_metrics.append(primary)
+            for m in intent_metrics:
+                if m not in metrics:
+                    metrics.append(m)
+
+        if len(intents) > 1:
+            demographic_profile = " | ".join(
+                _DEMOGRAPHIC_PROFILES[i] for i in intents if i in _DEMOGRAPHIC_PROFILES
+            )
+        else:
+            demographic_profile = _DEMOGRAPHIC_PROFILES.get(demographic_intent, _DEMOGRAPHIC_PROFILES["default"])
+            combined_primary_metrics = None  # single intent: no synthetic combined column needed
 
         try:
             dist_num = int(params.get("DISTRICT_NUM", 0))
@@ -634,7 +699,8 @@ TOP_N: [integer number of precincts to return, default 20]
             }
 
         output = PrecinctsAgent.get_top_precincts(
-            state_fips, geoid, district_type, metrics, top_n
+            state_fips, geoid, district_type, metrics, top_n,
+            combined_primary_metrics=combined_primary_metrics,
         )
 
         # Error path: get_top_precincts returns {"error": "..."} on failure
@@ -644,9 +710,10 @@ TOP_N: [integer number of precincts to return, default 20]
                 "active_agents": ["precincts"],
             }
 
-        precincts         = output["precincts"]
-        precinct_count    = output["precinct_count"]
-        data_quality_note = output["data_quality_note"]
+        precincts           = output["precincts"]
+        precinct_count      = output["precinct_count"]
+        data_quality_note   = output["data_quality_note"]
+        tract_fallback_used = output.get("tract_fallback_used", False)
 
         state_update: dict = {
             "structured_data": [{
@@ -670,5 +737,18 @@ TOP_N: [integer number of precincts to return, default 20]
         if data_quality_note:
             state_update["structured_data"][0]["data_quality_note"] = data_quality_note
             state_update["errors"] = [f"PrecinctsAgent: {data_quality_note}"]
+
+        if tract_fallback_used:
+            state_update["structured_data"][0]["tract_fallback_note"] = (
+                "College enrollment (B14001_005E) and/or education attainment (B15003) "
+                "data were sourced from Census tract level (ACS5 block-group data unavailable). "
+                "Results are less spatially granular than block-group targeting."
+            )
+
+        if len(intents) > 1:
+            state_update["structured_data"][0]["combined_demographics_note"] = (
+                f"Multi-demographic targeting: combined {' + '.join(intents)} groups. "
+                f"Precincts ranked by sum of: {', '.join(combined_primary_metrics or [])}."
+            )
 
         return state_update

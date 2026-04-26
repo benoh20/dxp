@@ -3,12 +3,13 @@ HTMX partial — assistant message bubble.
 Appended to #messages via hx-swap="beforeend" in chat.html.
 
 Context variables:
-    answer_html        str  — markdown rendered to HTML (mark as |safe)
-    active_agents      list — agent names e.g. ["researcher", "precincts"]
-    download_filename  str|None — basename of generated file
-    download_label     str|None — "Download Word Doc" or "Download CSV"
-    errors             list — non-fatal pipeline error strings
-    error              str|None — fatal error message (pipeline never ran)
+    answer_html          str  — markdown rendered to HTML (mark as |safe)
+    active_agents        list — agent names e.g. ["researcher", "precincts"]
+    generated_file_path  str|None — full path of generated file (truthy = show button)
+    generated_filename   str|None — basename only, used in /download/<filename>/ URL
+    download_label       str|None — "Download Word Doc", "Download CSV", "Download Excel"
+    errors               list — non-fatal pipeline error strings
+    error                str|None — fatal error message (pipeline never ran)
 {% endcomment %}
 
 {% if error %}
@@ -52,9 +53,9 @@ Context variables:
     {% endif %}
 
     <!-- Download button -->
-    {% if download_filename %}
+    {% if generated_file_path %}
     <div>
-      <a href="/download/{{ download_filename }}/" class="btn-download">
+      <a href="/download/{{ generated_filename }}/" class="btn-download">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
           <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10"
                 stroke="currentColor" stroke-width="1.6"

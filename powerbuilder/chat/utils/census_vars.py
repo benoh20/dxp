@@ -153,6 +153,7 @@ GRADUATE_DEGREE_VARS: dict[str, str] = {
 TRACT_ONLY_METRICS: frozenset = frozenset({
     "no_hs_diploma", "some_college", "graduate_degree",
     "graduate_educated", "bachelors_degree",
+    "college_enrolled",  # B14001_005E — enrolled in college; ACS5 block-group data unavailable
     *NO_HS_DIPLOMA_VARS.keys(),
     *SOME_COLLEGE_VARS.keys(),
     *GRADUATE_DEGREE_VARS.keys(),

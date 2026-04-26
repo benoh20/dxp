@@ -70,7 +70,7 @@ SYSTEM_PROMPT = (
 )
 
 # Agents whose presence together signals a full political plan run.
-PLAN_AGENTS = {"researcher", "election_results", "win_number", "precincts", "messaging", "finance"}
+PLAN_AGENTS = {"researcher", "election_results", "win_number", "precincts", "messaging", "cost_calculator"}
 
 # Section titles used in the plan docx — must match the template and synthesis prompt.
 PLAN_SECTION_ORDER = [
@@ -261,6 +261,12 @@ def _budget_tables(finance_entry: dict) -> tuple:
 # ---------------------------------------------------------------------------
 
 
+_ATTRIBUTION = (
+    "*Research sourced from American Bridge Research Books, Analyst Institute, "
+    "CIRCLE, and Powerbuilder's curated research corpus.*"
+)
+
+
 def _build_prompt(
     query: str,
     research_context: str,
@@ -268,7 +274,6 @@ def _build_prompt(
     active_agents: list,
     errors: list,
     is_plan: bool,
-    most_recent: str,
     district_label: str,
 ) -> str:
 
@@ -280,11 +285,6 @@ def _build_prompt(
             + "\n".join(f"  - {e}" for e in errors)
             + "\n"
         )
-
-    recency = (
-        f"\nResearch drawn from materials dated as recently as {most_recent}.\n"
-        if most_recent != "unknown" else ""
-    )
 
     if is_plan:
         structure = f"""
@@ -329,16 +329,16 @@ Do not reproduce raw numbers in a table — the win number table will be inserte
 3–5 concrete, prioritised action items for the campaign with rationale for each.
 
 End with (italicised):
-*Research sourced from materials dated as recently as {most_recent}.*
+{_ATTRIBUTION}
 """
     else:
         structure = f"""
 Produce a professional program briefing in Markdown responding to: "{query}"
 Use H2 for major sections. Use bullet lists and bold for emphasis.
-End with: *Research sourced from materials dated as recently as {most_recent}.*
+End with: {_ATTRIBUTION}
 """
 
-    return f"""{error_block}{recency}
+    return f"""{error_block}
 USER REQUEST: {query}
 AGENTS THAT CONTRIBUTED: {', '.join(active_agents) if active_agents else 'none'}
 
@@ -358,10 +358,9 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
     active_agents    = state.get("active_agents", [])
     errors           = state.get("errors", [])
 
-    research_ctx    = "\n\n".join(research_results) or "No research collected."
-    structured_ctx  = str(structured_data) if structured_data else "No structured data collected."
-    most_recent     = _most_recent_date(research_results)
-    district_lbl    = _district_label(structured_data)
+    research_ctx   = "\n\n".join(research_results) or "No research collected."
+    structured_ctx = str(structured_data) if structured_data else "No structured data collected."
+    district_lbl   = _district_label(structured_data)
 
     prompt = _build_prompt(
         query=state.get("query", ""),
@@ -370,7 +369,6 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
         active_agents=active_agents,
         errors=errors,
         is_plan=is_plan,
-        most_recent=most_recent,
         district_label=district_lbl,
     )
 
@@ -712,7 +710,18 @@ def export_node(state: AgentState) -> dict:
       query, research_results, structured_data, active_agents, errors, output_format
 
     Writes to state:
-      final_answer, generated_file_path (docx/xlsx/csv only), errors (format failures)
+      final_answer         — markdown synthesis, always set
+      generated_file_path  — set for full plans (docx) and explicit csv/xlsx requests
+      errors               — format failures (non-fatal)
+
+    Full plan behaviour (is_plan=True):
+      Always calls _write_docx regardless of output_format. _write_docx returns both
+      final_answer (the markdown synthesis for chat display) and generated_file_path
+      (the saved .docx path for the download button). output_format is ignored so that
+      the router's MARKDOWN default does not suppress file generation.
+
+    Non-plan behaviour (is_plan=False):
+      Uses the router-specified output_format as before.
     """
     active_agents = state.get("active_agents", [])
     output_format = state.get("output_format", "text")
@@ -736,19 +745,21 @@ def export_node(state: AgentState) -> dict:
 
     # -----------------------------------------------------------------------
     # 2. Format
+    # Full plans always use _write_docx so the Word file is generated alongside
+    # the markdown final_answer. Non-plan queries use the router-specified format.
     # -----------------------------------------------------------------------
-    handler = _HANDLERS.get(output_format, _write_text)
+    handler = _write_docx if is_plan else _HANDLERS.get(output_format, _write_text)
     try:
         result = handler(synthesis, state=state, district_label=district_lbl)
     except Exception as e:
-        logger.error(f"ExportAgent: formatting failed for '{output_format}' — {e}")
+        logger.error(f"ExportAgent: formatting failed — {e}")
         result = {
             "final_answer": synthesis,
-            "errors": [f"ExportAgent: Could not generate {output_format} file — {e}"],
+            "errors": [f"ExportAgent: Could not generate output file — {e}"],
         }
 
     logger.info(
-        f"ExportAgent: format={output_format} | plan={is_plan} | "
+        f"ExportAgent: format={'docx(plan)' if is_plan else output_format} | "
         f"district={district_lbl} | file={result.get('generated_file_path', 'none')}"
     )
     return result

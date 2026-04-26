@@ -37,7 +37,7 @@ UPLOAD_DIR       = "data/uploads"
 EXPORTS_DIR      = "exports"
 MAX_CONVERSATIONS = 20
 
-_ALLOWED_DOWNLOAD_EXTS = {".docx", ".csv"}
+_ALLOWED_DOWNLOAD_EXTS = {".docx", ".csv", ".xlsx"}
 
 _MD_EXTENSIONS = ["tables", "fenced_code", "nl2br"]
 
@@ -174,6 +174,8 @@ def send_message_view(request):
         logger.exception("Pipeline error: %s", exc)
         return render(request, "partials/message.html", {"error": f"Pipeline error: {exc}"})
 
+    print(f"[DEBUG] run_query keys={list(result.keys())} | generated_file_path={result.get('generated_file_path')}", flush=True)
+
     final_answer        = result.get("final_answer", "")
     active_agents       = result.get("active_agents", [])
     generated_file_path = result.get("generated_file_path")
@@ -183,16 +185,20 @@ def send_message_view(request):
     answer_html = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)
 
     # ── Download metadata ─────────────────────────────────────────────────────
-    download_filename = None
-    download_label    = None
+    generated_filename = None
+    download_label     = None
     if generated_file_path:
-        download_filename = os.path.basename(generated_file_path)
-        if download_filename.endswith(".docx"):
+        generated_filename = os.path.basename(generated_file_path)
+        ext = os.path.splitext(generated_filename)[1].lower()
+        if ext == ".docx":
             download_label = "Download Word Doc"
-        elif download_filename.endswith(".csv"):
+        elif ext == ".csv":
             download_label = "Download CSV"
+        elif ext == ".xlsx":
+            download_label = "Download Excel"
         else:
-            download_filename = None  # don't offer download for unknown types
+            generated_file_path = None
+            generated_filename  = None
 
     # ── Session history ───────────────────────────────────────────────────────
     conversations = request.session.get("conversations", [])
@@ -214,25 +220,26 @@ def send_message_view(request):
 
     conv["messages"].append({"role": "user", "content": query})
     conv["messages"].append({
-        "role":              "assistant",
-        "content":           final_answer,
-        "answer_html":       answer_html,
-        "active_agents":     active_agents,
+        "role":                "assistant",
+        "content":             final_answer,
+        "answer_html":         answer_html,
+        "active_agents":       active_agents,
         "generated_file_path": generated_file_path,
-        "download_filename": download_filename,
-        "download_label":    download_label,
-        "errors":            errors,
+        "generated_filename":  generated_filename,
+        "download_label":      download_label,
+        "errors":              errors,
     })
 
     request.session["conversations"] = conversations
     request.session.modified = True
 
     return render(request, "partials/message.html", {
-        "answer_html":       answer_html,
-        "active_agents":     active_agents,
-        "download_filename": download_filename,
-        "download_label":    download_label,
-        "errors":            errors,
+        "answer_html":         answer_html,
+        "active_agents":       active_agents,
+        "generated_file_path": generated_file_path,
+        "generated_filename":  generated_filename,
+        "download_label":      download_label,
+        "errors":              errors,
     })
 
 
@@ -264,6 +271,7 @@ def download_view(request, filename: str):
     content_types = {
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".csv":  "text/csv",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }
     response = HttpResponse(content, content_type=content_types[ext])
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
