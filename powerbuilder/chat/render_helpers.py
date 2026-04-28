@@ -407,10 +407,49 @@ def plan_outline(
         "is_plan":        bool(is_plan),
         "show_panel":     show_panel,
         "sections":       sections,
+        "groups":         _group_sections_by_h1(sections),
         "agents":         [agent_pill_label(a) for a in agents_list],
         "source_count":   source_count,
         "download_count": download_count,
     }
+
+
+def _group_sections_by_h1(sections: list[dict]) -> list[dict]:
+    """
+    Group flat outline sections under their h1 anchors for the panel UI
+    (Milestone G). Returns a list shaped like:
+
+        [
+          {"h1": {level, text, slug} | None,    # None == synthetic top group
+           "children": [{level, text, slug}, ...]},
+          ...
+        ]
+
+    Rules:
+      - Sections appearing before the first h1 land in a synthetic 'h1=None'
+        group at the top, so they don't get orphaned. The template renders
+        that group without a header.
+      - Each h1 owns every following section (h2, h3, ...) until the next
+        h1, regardless of nesting depth. We keep h2/h3/... distinction
+        intact via the existing 'level' field; the template applies the
+        same indent classes it always has.
+      - If there are zero h1s anywhere, we return a single synthetic group
+        containing every section so the existing flat-list behaviour is
+        preserved for shorter plans.
+    """
+    groups: list[dict] = []
+    current: dict | None = None
+    for s in sections:
+        if s["level"] == 1:
+            current = {"h1": s, "children": []}
+            groups.append(current)
+            continue
+        if current is None:
+            # Sub-headings before the first h1: open a synthetic group
+            current = {"h1": None, "children": []}
+            groups.append(current)
+        current["children"].append(s)
+    return groups
 
 
 # ---------------------------------------------------------------------------

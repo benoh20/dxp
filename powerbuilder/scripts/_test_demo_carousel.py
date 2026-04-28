@@ -47,11 +47,15 @@ def _render(demo_mode: bool) -> str:
     rf = RequestFactory()
     request = rf.get("/")
     # Inject only the bits the template reads; avoids running the full view.
+    # Milestone G: demo_tiles is now context-driven (was hardcoded in template),
+    # so we feed it the same source of truth the view does.
+    from chat.demo_tiles import get_demo_tiles
     ctx = {
         "DEMO_MODE": demo_mode,
         "messages": [],
         "conversations": [],
         "current_conversation": None,
+        "demo_tiles": get_demo_tiles(),
     }
     return render_to_string("chat.html", ctx, request=request)
 

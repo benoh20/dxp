@@ -44,6 +44,7 @@ from .render_helpers import (
     sanitize_errors,
     scrub_answer_text,
 )
+from .demo_tiles import get_demo_tiles
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,7 @@ def chat_view(request):
         "conversations":    enriched,
         "current_messages": current_messages,
         "current_conv_id":  current_id,
+        "demo_tiles":       get_demo_tiles(),  # Milestone G: configurable carousel
     })
 
 

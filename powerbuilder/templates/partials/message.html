@@ -172,15 +172,45 @@ Context variables:
       </button>
     </header>
 
-    {% if outline.sections %}
+    {# Milestone G: sections grouped under their h1 anchors. Each group is
+       a <details> element so users can collapse a section they don't need.
+       open="open" by default keeps everything visible on first render. The
+       synthetic 'h1=None' group (sub-headings appearing before the first
+       h1) renders its children directly with no toggle so we don't show an
+       empty disclosure triangle. #}
+    {% if outline.groups %}
     <nav class="plan-panel-nav" aria-label="Sections">
-      <ul>
-        {% for section in outline.sections %}
-        <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
-          <a href="#{{ bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
-        </li>
-        {% endfor %}
-      </ul>
+      {% for group in outline.groups %}
+        {% if group.h1 %}
+        <details class="plan-panel-group" open data-group-h1="{{ group.h1.slug }}">
+          <summary class="plan-panel-group-head">
+            <svg class="plan-panel-group-caret" width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M5 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <a href="#{{ bubble_id }}-{{ group.h1.slug }}"
+               class="plan-panel-group-title"
+               data-action="jump-section">{{ group.h1.text }}</a>
+          </summary>
+          {% if group.children %}
+          <ul class="plan-panel-group-list">
+            {% for section in group.children %}
+            <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
+              <a href="#{{ bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </details>
+        {% else %}
+        <ul class="plan-panel-group-list plan-panel-group-list--orphan">
+          {% for section in group.children %}
+          <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
+            <a href="#{{ bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      {% endfor %}
     </nav>
     {% endif %}
 

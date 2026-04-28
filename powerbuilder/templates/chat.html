@@ -373,6 +373,71 @@
   }
   .plan-panel-nav-item--lvl1 a { color: var(--text-primary); font-weight: 600; }
 
+  /* ── Plan-panel h1 grouping (Milestone G) ───────────────────── */
+  /* Each <details class="plan-panel-group"> wraps an h1 + its sub-headings.
+     The native disclosure widget gives us free keyboard support; we hide
+     the default ::-webkit-details-marker and ship our own caret SVG that
+     rotates 90deg when the group is open. */
+  .plan-panel-group {
+    margin-bottom: 0.5rem;
+  }
+  .plan-panel-group:last-child { margin-bottom: 0; }
+  .plan-panel-group > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .plan-panel-group > summary::-webkit-details-marker { display: none; }
+  .plan-panel-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-weight: 600;
+    line-height: 1.35;
+    transition: background 0.12s;
+  }
+  .plan-panel-group-head:hover {
+    background: rgba(59,130,246,0.08);
+  }
+  .plan-panel-group-caret {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transform: rotate(0deg);
+    transition: transform 0.15s ease;
+  }
+  .plan-panel-group[open] > summary .plan-panel-group-caret {
+    transform: rotate(90deg);
+  }
+  .plan-panel-group-title {
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .plan-panel-group-title:hover {
+    color: var(--accent);
+  }
+  .plan-panel-group-list {
+    list-style: none;
+    padding: 0.15rem 0 0.15rem 0.95rem;  /* indent under caret */
+    margin: 0;
+    border-left: 1px dashed rgba(255,255,255,0.07);
+    margin-left: 0.7rem;
+  }
+  .plan-panel-group-list--orphan {
+    /* Sub-headings before the first h1: no caret to align under, drop
+       the indent and let them sit flush with the panel edge. */
+    border-left: 0;
+    padding-left: 0;
+    margin-left: 0;
+    margin-bottom: 0.5rem;
+  }
+
   .plan-panel-meta {
     border-top: 1px dashed rgba(255,255,255,0.08);
     padding-top: 0.55rem;
@@ -1225,15 +1290,40 @@
                     </svg>
                   </button>
                 </header>
-                {% if msg.outline.sections %}
+                {# Milestone G: grouped under h1 anchors, same as the live render. #}
+                {% if msg.outline.groups %}
                 <nav class="plan-panel-nav" aria-label="Sections">
-                  <ul>
-                    {% for section in msg.outline.sections %}
-                    <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
-                      <a href="#{{ msg.bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
-                    </li>
-                    {% endfor %}
-                  </ul>
+                  {% for group in msg.outline.groups %}
+                    {% if group.h1 %}
+                    <details class="plan-panel-group" open data-group-h1="{{ group.h1.slug }}">
+                      <summary class="plan-panel-group-head">
+                        <svg class="plan-panel-group-caret" width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M5 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <a href="#{{ msg.bubble_id }}-{{ group.h1.slug }}"
+                           class="plan-panel-group-title"
+                           data-action="jump-section">{{ group.h1.text }}</a>
+                      </summary>
+                      {% if group.children %}
+                      <ul class="plan-panel-group-list">
+                        {% for section in group.children %}
+                        <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
+                          <a href="#{{ msg.bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
+                        </li>
+                        {% endfor %}
+                      </ul>
+                      {% endif %}
+                    </details>
+                    {% else %}
+                    <ul class="plan-panel-group-list plan-panel-group-list--orphan">
+                      {% for section in group.children %}
+                      <li class="plan-panel-nav-item plan-panel-nav-item--lvl{{ section.level }}">
+                        <a href="#{{ msg.bubble_id }}-{{ section.slug }}" data-action="jump-section">{{ section.text }}</a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                    {% endif %}
+                  {% endfor %}
                 </nav>
                 {% endif %}
                 <div class="plan-panel-meta">
@@ -1274,41 +1364,19 @@
               <p class="empty-subtitle">Pick a starter below or ask your own question.</p>
             </div>
 
+            {# Milestone G: tiles come from chat/demo_tiles.py so the prompt    #}
+            {# copy can be edited without touching the template. The data-tile #}
+            {# attribute exposes the tile id for click tracking + tests.       #}
             <div class="demo-carousel" role="list" aria-label="Demo prompts">
+              {% for tile in demo_tiles %}
               <button type="button" class="demo-tile" role="listitem"
-                data-prompt="Build a Gwinnett County GOTV plan targeting Latinx voters age 18 to 35. Generate a Spanish door-knock script and give me a CSV of the target list.">
-                <span class="demo-tile-chip demo-tile-chip--plan">Full plan</span>
-                <span class="demo-tile-headline">Gwinnett GOTV, Latinx 18 to 35</span>
-                <span class="demo-tile-preview">Spanish door-knock script and a CSV target list.</span>
+                data-tile="{{ tile.id }}"
+                data-prompt="{{ tile.prompt }}">
+                <span class="demo-tile-chip demo-tile-chip--{{ tile.chip_kind }}">{{ tile.chip }}</span>
+                <span class="demo-tile-headline">{{ tile.headline }}</span>
+                <span class="demo-tile-preview">{{ tile.preview }}</span>
               </button>
-
-              <button type="button" class="demo-tile" role="listitem"
-                data-prompt="What is the win number for Georgia's 7th Congressional District in a midterm cycle? Show me the math.">
-                <span class="demo-tile-chip demo-tile-chip--win">Win number</span>
-                <span class="demo-tile-headline">Win number for GA-07, midterm</span>
-                <span class="demo-tile-preview">Quick lookup, shows CVAP and turnout math.</span>
-              </button>
-
-              <button type="button" class="demo-tile" role="listitem"
-                data-prompt="Pull opposition research on the Republican candidate in Georgia's 6th Congressional District. Give me the top vulnerabilities and three contrast messaging angles.">
-                <span class="demo-tile-chip demo-tile-chip--opp">Opposition</span>
-                <span class="demo-tile-headline">GOP opponent in GA-06</span>
-                <span class="demo-tile-preview">Vulnerabilities and contrast angles from research books.</span>
-              </button>
-
-              <button type="button" class="demo-tile" role="listitem"
-                data-prompt="Draft a Vietnamese-language text message to AAPI voters in Gwinnett about early voting locations and hours.">
-                <span class="demo-tile-chip demo-tile-chip--lang">Multilingual</span>
-                <span class="demo-tile-headline">Vietnamese text to AAPI voters</span>
-                <span class="demo-tile-preview">Tests language detection plus messaging agent.</span>
-              </button>
-
-              <button type="button" class="demo-tile" role="listitem"
-                data-prompt="Segment my voter file by age cohort and party, then match each segment to the right canvassing script and turnout tactic.">
-                <span class="demo-tile-chip demo-tile-chip--vf">Voter file</span>
-                <span class="demo-tile-headline">Segment my list and match scripts</span>
-                <span class="demo-tile-preview">Uses the attached synthetic voterfile in demo mode.</span>
-              </button>
+              {% endfor %}
             </div>
 
             <p class="empty-hint">Loads into the input box. Edit anything, then hit send.</p>
