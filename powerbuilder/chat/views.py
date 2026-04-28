@@ -35,6 +35,8 @@ from .render_helpers import (
     is_plan_run,
     c3_footer_text,
     agent_pill_label,
+    auto_title,
+    enrich_downloads,
 )
 
 logger = logging.getLogger(__name__)
@@ -252,13 +254,17 @@ def send_message_view(request):
         current_id = str(uuid.uuid4())
         conv = {
             "id":        current_id,
-            "title":     query[:40],
+            "title":     auto_title(query),
             "timestamp": time.strftime("%Y-%m-%d %H:%M"),
             "messages":  [],
         }
         conversations.insert(0, conv)
         conversations = conversations[:MAX_CONVERSATIONS]
         request.session["current_conv_id"] = current_id
+
+    # Enrich downloads with thumbnail metadata so both the live render and
+    # session-restored history can show typed badges without re-running this.
+    downloads = enrich_downloads(downloads)
 
     conv["messages"].append({"role": "user", "content": query})
     conv["messages"].append({
@@ -441,6 +447,10 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     if not downloads:
         generated_file_path = None
 
+    # Attach thumbnail metadata (kind/color) so download cards render with
+    # typed badges in both the live bubble and any session-restored history.
+    downloads = enrich_downloads(downloads)
+
     bubble_html = render_to_string("partials/message.html", {
         "answer_html":         answer_html,
         "active_agents":       active_agents,
@@ -461,7 +471,7 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
         current_id = str(uuid.uuid4())
         conv = {
             "id":        current_id,
-            "title":     query[:40],
+            "title":     auto_title(query),
             "timestamp": time.strftime("%Y-%m-%d %H:%M"),
             "messages":  [],
         }

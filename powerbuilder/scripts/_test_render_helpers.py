@@ -27,6 +27,9 @@ from chat.render_helpers import (  # noqa: E402
     is_plan_run,
     c3_footer_text,
     agent_pill_label,
+    auto_title,
+    download_thumb_kind,
+    enrich_downloads,
 )
 
 
@@ -142,8 +145,82 @@ def main() -> int:
     if agent_pill_label("") != "":
         failures.append("agent_pill_label('') should be ''")
 
+    # 12. auto_title strips filler, title-cases, preserves codes/hyphens.
+    cases_title = [
+        ("What is the win number for GA-07 in the midterm?",
+         lambda t: "GA-07" in t and "Win" in t and "Number" in t),
+        ("Please draft a Spanish door-knock script for Latinx voters",
+         lambda t: "Spanish" in t and "Door-Knock" in t and "Latinx" in t),
+        ("Show me the GOP opponent in GA-06",
+         lambda t: "GOP" in t and "GA-06" in t),  # GOP stays uppercase
+        ("",  lambda t: t == "New conversation"),
+        ("   ", lambda t: t == "New conversation"),
+        ("hi", lambda t: t.lower() == "hi"),  # short greetings still produce something
+        ("how are you", lambda t: t == "New conversation" or len(t) <= 48),  # all stopwords -> fallback
+    ]
+    for q, check in cases_title:
+        title = auto_title(q)
+        if not check(title):
+            failures.append(f"auto_title({q!r}) returned unexpected: {title!r}")
+
+    # auto_title respects the 6-word cap.
+    long_q = "Find the best Spanish door-knock script targeting Latinx voters in Gwinnett County for the November midterm election cycle"
+    long_title = auto_title(long_q)
+    word_count = len(long_title.split())
+    if word_count > 6:
+        failures.append(f"auto_title should cap at 6 words, got {word_count}: {long_title!r}")
+
+    # auto_title respects the 48-char cap with ellipsis.
+    huge_q = "Massachusetts Connecticut Pennsylvania Wisconsin Minnesota Iowa Nebraska Kansas"
+    huge_title = auto_title(huge_q)
+    if len(huge_title) > 48:
+        failures.append(f"auto_title should cap at 48 chars, got {len(huge_title)}: {huge_title!r}")
+
+    # 13. download_thumb_kind maps known extensions correctly.
+    cases_thumb = [
+        ("plan_2026.docx",       "DOCX", "#3b82f6"),
+        ("target_list.csv",      "CSV",  "#22c55e"),
+        ("budget.xlsx",          "XLSX", "#16a34a"),
+        ("oppo_book.pdf",        "PDF",  "#ef4444"),
+        ("unknown.zzz",          "FILE", "#6b7280"),
+        ("no_extension",         "FILE", "#6b7280"),
+        (None,                   "FILE", "#6b7280"),
+    ]
+    for fname, want_kind, want_color in cases_thumb:
+        got = download_thumb_kind(fname)
+        if got["kind"] != want_kind:
+            failures.append(f"thumb_kind({fname!r}) kind={got['kind']!r}, expected {want_kind!r}")
+        if got["color"] != want_color:
+            failures.append(f"thumb_kind({fname!r}) color={got['color']!r}, expected {want_color!r}")
+
+    # Case-insensitive on extension (.DOCX should still resolve).
+    if download_thumb_kind("PLAN.DOCX")["kind"] != "DOCX":
+        failures.append("thumb_kind should lowercase the extension")
+
+    # 14. enrich_downloads attaches thumb_kind / thumb_color without mutating input.
+    base = [
+        {"filename": "plan.docx",   "label": "Download Word Doc"},
+        {"filename": "targets.csv", "label": "Download CSV"},
+    ]
+    enriched = enrich_downloads(base)
+    if len(enriched) != 2:
+        failures.append(f"enrich_downloads should preserve count, got {len(enriched)}")
+    if enriched and enriched[0].get("thumb_kind") != "DOCX":
+        failures.append(f"enriched[0] missing/incorrect thumb_kind: {enriched[0]}")
+    if enriched and enriched[1].get("thumb_kind") != "CSV":
+        failures.append(f"enriched[1] missing/incorrect thumb_kind: {enriched[1]}")
+    if "thumb_kind" in base[0]:
+        failures.append("enrich_downloads must not mutate the input dicts")
+    if enrich_downloads(None) != []:
+        failures.append("enrich_downloads(None) should return []")
+    if enrich_downloads([]) != []:
+        failures.append("enrich_downloads([]) should return []")
+    # Non-dict entries are tolerated/skipped.
+    if enrich_downloads(["not a dict", {"filename": "a.csv", "label": "L"}]) == []:
+        failures.append("enrich_downloads should keep valid dicts even with garbage neighbors")
+
     # Report.
-    print("chat.render_helpers test: 16+ assertions across 11 cases.")
+    print("chat.render_helpers test: 32+ assertions across 14 cases.")
     if failures:
         print(f"FAIL: {len(failures)} assertion(s) failed:")
         for f in failures:
