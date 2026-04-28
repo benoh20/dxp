@@ -52,8 +52,21 @@ Context variables:
     </div>
     {% endif %}
 
-    <!-- Download button -->
-    {% if generated_file_path %}
+    <!-- Download buttons (one per generated file: e.g. DOCX script + CSV target list) -->
+    {% if downloads %}
+    <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+      {% for d in downloads %}
+      <a href="/download/{{ d.filename }}/" class="btn-download">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10"
+                stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        {{ d.label }}
+      </a>
+      {% endfor %}
+    </div>
+    {% elif generated_file_path %}
     <div>
       <a href="/download/{{ generated_filename }}/" class="btn-download">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none">

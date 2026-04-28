@@ -20,6 +20,7 @@ import time
 import uuid
 
 import markdown as md_lib
+from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
@@ -161,6 +162,18 @@ def send_message_view(request):
                 fh.write(chunk)
         uploaded_file_path = dest
 
+    # ── DEMO_MODE: auto-attach the synthetic Gwinnett voterfile ──────────────
+    # When the upload UI is hidden (DEMO_MODE is on) the operator cannot attach
+    # a voterfile through the chat. We auto-attach the curated synthetic file
+    # so the voterfile + export agents can run and produce a CSV target list.
+    # Real uploads (when DEMO_MODE is off) take precedence over the demo file.
+    if uploaded_file_path is None and getattr(settings, "DEMO_MODE", False):
+        demo_voterfile = os.path.join(
+            settings.BASE_DIR, "data", "demo", "gwinnett_demo_voterfile.csv"
+        )
+        if os.path.exists(demo_voterfile):
+            uploaded_file_path = demo_voterfile
+
     # ── Pipeline ─────────────────────────────────────────────────────────────
     try:
         from .agents.manager import run_query  # deferred import to avoid circular
@@ -185,20 +198,29 @@ def send_message_view(request):
     answer_html = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)
 
     # ── Download metadata ─────────────────────────────────────────────────────
-    generated_filename = None
-    download_label     = None
-    if generated_file_path:
-        generated_filename = os.path.basename(generated_file_path)
-        ext = os.path.splitext(generated_filename)[1].lower()
-        if ext == ".docx":
-            download_label = "Download Word Doc"
-        elif ext == ".csv":
-            download_label = "Download CSV"
-        elif ext == ".xlsx":
-            download_label = "Download Excel"
-        else:
-            generated_file_path = None
-            generated_filename  = None
+    # Build a list of downloads, one entry per generated file. Each entry has a
+    # filename (used in /download/<filename>/) and a human-readable label.
+    _label_by_ext = {
+        ".docx": "Download Word Doc",
+        ".csv":  "Download CSV",
+        ".xlsx": "Download Excel",
+    }
+    downloads = []
+    for fp in generated_files:
+        if not fp:
+            continue
+        fname = os.path.basename(fp)
+        ext   = os.path.splitext(fname)[1].lower()
+        label = _label_by_ext.get(ext)
+        if not label:
+            continue
+        downloads.append({"filename": fname, "label": label})
+
+    # Backward-compatible single-file fields (first download, if any).
+    generated_filename = downloads[0]["filename"] if downloads else None
+    download_label     = downloads[0]["label"]    if downloads else None
+    if not downloads:
+        generated_file_path = None
 
     # ── Session history ───────────────────────────────────────────────────────
     conversations = request.session.get("conversations", [])

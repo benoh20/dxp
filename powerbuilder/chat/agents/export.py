@@ -752,14 +752,45 @@ def export_node(state: AgentState) -> dict:
     try:
         result = handler(synthesis, state=state, district_label=district_lbl)
     except Exception as e:
-        logger.error(f"ExportAgent: formatting failed — {e}")
+        logger.error(f"ExportAgent: formatting failed (primary) - {e}")
         result = {
             "final_answer": synthesis,
-            "errors": [f"ExportAgent: Could not generate output file — {e}"],
+            "errors": [f"ExportAgent: Could not generate output file - {e}"],
         }
+
+    # Track all generated files so the UI can offer multiple downloads.
+    generated_files: list[str] = []
+    primary = result.get("generated_file_path")
+    if primary:
+        generated_files.append(primary)
+
+    # ---- 2b. CSV companion for full plans ----------------------------------
+    # Plans typically include a target list of precincts. Always emit a CSV
+    # alongside the DOCX so the operator gets both the script (DOCX) and the
+    # walk/call list (CSV) from a single chat turn. Non-plan queries that
+    # explicitly asked for csv already used _write_csv as the primary handler
+    # (skip in that case).
+    if is_plan:
+        precinct_entry = _get_entry(structured_data, "precincts")
+        if precinct_entry and precinct_entry.get("precincts"):
+            try:
+                csv_result = _write_csv(synthesis, state=state, district_label=district_lbl)
+                csv_path = csv_result.get("generated_file_path")
+                if csv_path and csv_path not in generated_files:
+                    generated_files.append(csv_path)
+            except Exception as e:
+                logger.error(f"ExportAgent: CSV companion failed - {e}")
+                existing_errors = list(result.get("errors", []))
+                existing_errors.append(
+                    f"ExportAgent: Could not generate CSV companion - {e}"
+                )
+                result["errors"] = existing_errors
+
+    if generated_files:
+        result["generated_files"] = generated_files
 
     logger.info(
         f"ExportAgent: format={'docx(plan)' if is_plan else output_format} | "
-        f"district={district_lbl} | file={result.get('generated_file_path', 'none')}"
+        f"district={district_lbl} | files={generated_files or 'none'}"
     )
     return result

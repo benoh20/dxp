@@ -30,7 +30,8 @@ class AgentState(TypedDict):
 
     # -- Final Output --
     final_answer: str
-    generated_file_path: Optional[str]  # path to generated output file
+    generated_file_path: Optional[str]  # path to primary generated output file (DOCX for plans)
+    generated_files: Optional[List[str]]  # all generated files; for plans this is [DOCX, CSV]
 
     # -- Observability --
     errors: Annotated[List[str], operator.add]        # non-fatal errors from any agent
