@@ -35,11 +35,13 @@ logger = logging.getLogger(__name__)
 
 FIELD_SCHEMA: dict[str, list[str]] = {
     # Identifiers
-    "voter_id":              ["voter_id", "vanid", "van_id", "tsmart_key", "catalist_id",
-                              "l2_id", "state_voter_id", "registrant_id", "id"],
-    "first_name":            ["first_name", "firstname", "fname", "LFirstName", "first"],
-    "last_name":             ["last_name", "lastname", "lname", "LLastName", "last"],
-    "full_name":             ["full_name", "fullname", "name"],
+    "voter_id":              ["voter_id", "vanid", "van_id", "tsmart_key", "voterbase_id",
+                              "catalist_id", "l2_id", "state_voter_id", "registrant_id", "id"],
+    "first_name":            ["first_name", "firstname", "fname", "LFirstName", "first",
+                              "tsmart_first_name", "voterbase_first_name"],
+    "last_name":             ["last_name", "lastname", "lname", "LLastName", "last",
+                              "tsmart_last_name", "voterbase_last_name"],
+    "full_name":             ["full_name", "fullname", "name", "tsmart_full_name"],
 
     # Geography
     "address":               ["address", "street_address", "mailing_address", "residence_address"],
@@ -53,9 +55,11 @@ FIELD_SCHEMA: dict[str, list[str]] = {
     "state_house_district":  ["state_house_district", "state_house", "hd", "house_district"],
 
     # Demographics
-    "age":                   ["age", "voter_age", "Age"],
-    "dob":                   ["dob", "date_of_birth", "birth_date", "birthdate"],
-    "gender":                ["gender", "sex", "gender_code", "LGender"],
+    "age":                   ["age", "voter_age", "Age", "voterbase_age", "tsmart_age"],
+    "dob":                   ["dob", "date_of_birth", "birth_date", "birthdate",
+                              "voterbase_dob", "tsmart_dob"],
+    "gender":                ["gender", "sex", "gender_code", "LGender",
+                              "voterbase_gender", "tsmart_gender"],
     "race":                  ["race", "race_ethnicity", "ethnicity", "race_ethnic",
                               "LRace", "tsmart_race", "cat_race"],
     "party_registration":    ["party_registration", "party", "party_code", "registration_party",

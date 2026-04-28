@@ -23,6 +23,7 @@ class AgentState(TypedDict):
     router_decision: str # this holds the intent
     output_format: Literal["markdown", "csv", "text", "docx", "xlsx"] # define target file type
     demographic_intent: Optional[str]  # set by intent_router via keyword scan; "a+b" for combined demographics
+    language_intent: Optional[str]     # set by intent_router via keyword scan; ISO 639-1 code (e.g. "es", "en", "zh", "vi", "ko")
 
     # -- File Handling --
     uploaded_file_path: Optional[str] # path to new file for ingesting

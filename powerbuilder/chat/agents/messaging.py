@@ -84,6 +84,21 @@ FORMAT_DESCRIPTIONS = {
     ),
 }
 
+# Maps ISO 639-1 language codes to a (display_name, native_call_to_arms) pair.
+# Used to construct the language directive at the top of the prompt and the
+# label in the output header. Add new languages here — messaging.py is the
+# only place a translator-style instruction is needed.
+LANGUAGE_LABELS: dict[str, tuple[str, str]] = {
+    "en": ("English",    ""),
+    "es": ("Spanish",    " Use warm, respectful t\u00fa-form address (not formal usted) for door knocks; "
+                         "use usted for phone scripts and mail to elders. Prefer plain conversational "
+                         "Spanish over translated political jargon."),
+    "zh": ("Mandarin Chinese", " Use Simplified Chinese characters. Prefer respectful, plain phrasing "
+                               "over Anglicisms or transliterations."),
+    "vi": ("Vietnamese", " Use respectful Vietnamese forms appropriate to the audience age cohort."),
+    "ko": ("Korean",     " Use \ud574\uc694-style polite form for door knocks; \ud569\uc2dc\ub2e4-style formal form for mail."),
+}
+
 # Section markers used to split the LLM's single response into five strings.
 # The LLM is explicitly instructed to preserve these exactly.
 SECTION_MARKERS = {
@@ -311,6 +326,13 @@ def messaging_node(state: AgentState) -> dict:
     """
     research_results = state.get("research_results", [])
     structured_data  = state.get("structured_data", [])
+    language_code    = (state.get("language_intent") or "en").lower()
+    if language_code not in LANGUAGE_LABELS:
+        logger.warning(
+            f"MessagingAgent: Unknown language_intent '{language_code}' — falling back to English."
+        )
+        language_code = "en"
+    language_name, language_style = LANGUAGE_LABELS[language_code]
 
     # -----------------------------------------------------------------------
     # 1. Read precinct demographic context from the whiteboard
@@ -359,10 +381,28 @@ def messaging_node(state: AgentState) -> dict:
     # -----------------------------------------------------------------------
     llm = get_completion_client(temperature=0.4)  # modest creativity for copywriting
 
+    # Build the language directive. For non-English requests this is the single
+    # most important instruction in the prompt — it goes BEFORE the hard
+    # constraint so the model cannot accidentally fall back to English.
+    if language_code == "en":
+        language_directive = ""
+    else:
+        language_directive = (
+            f"\u2501\u2501\u2501 LANGUAGE DIRECTIVE — NON-NEGOTIABLE \u2501\u2501\u2501\n"
+            f"WRITE ALL FIVE MESSAGING SECTIONS IN {language_name.upper()}.\n"
+            f"Section headers, markers, and instructions stay in English; "
+            f"all script content (greetings, talking points, CTAs, dialogue, "
+            f"objection handling, ad copy) must be in {language_name}.\n"
+            f"Do NOT translate the SECTION_MARKERS — keep them exactly as printed.\n"
+            f"Do NOT include English versions or parenthetical translations.\n"
+            f"{language_style.strip()}\n"
+            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
+        )
+
     prompt = f"""You are an expert field organizer and political messaging strategist.
 Generate targeted campaign messaging materials for the {district_label}.
 
-━━━ HARD CONSTRAINT — READ CAREFULLY ━━━
+{language_directive}━━━ HARD CONSTRAINT — READ CAREFULLY ━━━
 You must draw ALL content EXCLUSIVELY from the RESEARCH FINDINGS section below.
 Do NOT invent statistics, polling numbers, quotes, or claims not present there.
 Do NOT reference issues, demographics, or events not mentioned in the research.
@@ -418,12 +458,15 @@ Do not rename, reorder, or omit any marker.
     sections = _parse_sections(raw_response)
 
     formatted_outputs = []
+    # Surface the language in the header so the synthesizer (and any human
+    # reviewer) can see at a glance which language was produced.
+    lang_tag = f" | LANGUAGE: {language_name}" if language_code != "en" else ""
     for key, label in FORMAT_LABELS.items():
         content = sections.get(key)
         if content:
             formatted_outputs.append(
                 f"--- MESSAGING OUTPUT: {label} | DISTRICT: {district_label} "
-                f"| RESEARCH DATE: {most_recent_date} ---\n{content}\n"
+                f"| RESEARCH DATE: {most_recent_date}{lang_tag} ---\n{content}\n"
             )
 
     if not formatted_outputs:
@@ -434,7 +477,8 @@ Do not rename, reorder, or omit any marker.
 
     logger.info(
         f"MessagingAgent: Generated {len(formatted_outputs)}/5 messaging formats "
-        f"for {district_label} using research dated as recently as {most_recent_date}."
+        f"for {district_label} in {language_name} using research dated as "
+        f"recently as {most_recent_date}."
     )
 
     return {

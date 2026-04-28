@@ -65,6 +65,43 @@ def _detect_demographic_intent(query: str) -> str:
         return "default"
     return "+".join(matches)
 
+# Language detection — keyword scan for explicit language requests in the user query.
+# Returns ISO 639-1 codes. "en" is the default when no other language is requested.
+# Supports Spanish, Mandarin, Vietnamese, Korean — the four most common non-English
+# languages spoken at home in Gwinnett County (and broadly in GA-07).
+_LANGUAGE_KEYWORDS = {
+    "es": (
+        "spanish", "en espa\u00f1ol", "en espanol", "espa\u00f1ol",
+        "in spanish", "hispanohablante", "hispanohablantes",
+        "spanish-speaking", "spanish speaking", "spanish-language",
+        "latinx voters", "latino voters", "latina voters",
+    ),
+    "zh": (
+        "mandarin", "chinese", "in chinese", "in mandarin",
+        "chinese-speaking", "mandarin-speaking", "\u4e2d\u6587",
+    ),
+    "vi": (
+        "vietnamese", "in vietnamese", "vietnamese-speaking",
+        "vietnamese-language", "ti\u1ebfng vi\u1ec7t",
+    ),
+    "ko": (
+        "korean", "in korean", "korean-speaking", "korean-language",
+        "\ud55c\uad6d\uc5b4",
+    ),
+}
+
+def _detect_language_intent(query: str) -> str:
+    """
+    Return the ISO 639-1 code of the first non-English language matched in the
+    query. Defaults to "en". Order is deterministic by dict insertion.
+    """
+    q = query.lower()
+    for code, kws in _LANGUAGE_KEYWORDS.items():
+        if any(kw in q for kw in kws):
+            return code
+    return "en"
+
+
 # Keyword-based fast path for voter file queries — avoids an LLM call for clear cases.
 _VOTER_FILE_KEYWORDS = (
     "voter file", "voterfile", "voter list", "my list", "upload list",
@@ -117,6 +154,10 @@ def triage_router(state: AgentState):
 
 # Intent Router / Classification
 def intent_router_node(state: AgentState):
+    # Detect language once — every return path below carries it through state
+    # so downstream agents (messaging in particular) can produce non-English copy.
+    language = _detect_language_intent(state["query"])
+
     # Fast path: skip LLM for unambiguous voter file queries — only when a file
     # is actually present; keyword match alone must not route to voter_file.
     active_agents  = state.get("active_agents", [])
@@ -129,6 +170,7 @@ def intent_router_node(state: AgentState):
             "router_decision":    "voter_file",
             "output_format":      "markdown",
             "demographic_intent": "default",
+            "language_intent":    language,
         }
 
     # Fast path: opposition research queries — run election_results first to get
@@ -140,12 +182,14 @@ def intent_router_node(state: AgentState):
                 "router_decision":    "election_results",
                 "output_format":      "markdown",
                 "demographic_intent": demographic,
+                "language_intent":    language,
             }
         if "opposition_research" not in active_agents:
             return {
                 "router_decision":    "opposition_research",
                 "output_format":      "markdown",
                 "demographic_intent": demographic,
+                "language_intent":    language,
             }
 
     # Fast path: voter file sequence (no district) — after voter_file, force
@@ -153,12 +197,12 @@ def intent_router_node(state: AgentState):
     if "voter_file" in active_agents and not _has_district_reference(state["query"]):
         demographic = _detect_demographic_intent(state["query"])
         if "researcher" not in active_agents:
-            return {"router_decision": "researcher",       "output_format": "markdown", "demographic_intent": demographic}
+            return {"router_decision": "researcher",       "output_format": "markdown", "demographic_intent": demographic, "language_intent": language}
         if "messaging" not in active_agents:
-            return {"router_decision": "messaging",        "output_format": "markdown", "demographic_intent": demographic}
+            return {"router_decision": "messaging",        "output_format": "markdown", "demographic_intent": demographic, "language_intent": language}
         if "cost_calculator" not in active_agents:
-            return {"router_decision": "cost_calculator",  "output_format": "markdown", "demographic_intent": demographic}
-        return     {"router_decision": "finish",           "output_format": "markdown", "demographic_intent": demographic}
+            return {"router_decision": "cost_calculator",  "output_format": "markdown", "demographic_intent": demographic, "language_intent": language}
+        return     {"router_decision": "finish",           "output_format": "markdown", "demographic_intent": demographic, "language_intent": language}
 
     llm = get_model()
 
@@ -232,6 +276,17 @@ def intent_router_node(state: AgentState):
     if decision == "VOTER_FILE" and not state.get("uploaded_file_path"):
         decision = "RESEARCHER"
 
+    # Safety guard: messaging requires research_results to be populated.
+    # If the LLM picked MESSAGING but the researcher has not run yet, force
+    # researcher first. This eliminates the "No research findings in state"
+    # warning observed in the live demo when the LLM router skipped ahead.
+    if (
+        decision == "MESSAGING"
+        and not state.get("research_results")
+        and "researcher" not in active_agents
+    ):
+        decision = "RESEARCHER"
+
     formats = ["CSV", "MARKDOWN", "TEXT"]
     fmt = next((f for f in formats if f in response), "TEXT").lower()
 
@@ -239,6 +294,7 @@ def intent_router_node(state: AgentState):
         "router_decision":    decision.lower(),
         "output_format":      fmt,
         "demographic_intent": _detect_demographic_intent(state["query"]),
+        "language_intent":    language,
     }
 
 # Constructing workflow for user request
