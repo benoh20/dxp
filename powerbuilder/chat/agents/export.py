@@ -464,6 +464,146 @@ def _add_table(doc, headers: list, rows: list):
 
 
 # ---------------------------------------------------------------------------
+# Paid-media section: styled DOCX renderer for the structured paid_media dict
+# ---------------------------------------------------------------------------
+
+
+def _strip_inline_paid_media(text: str) -> str:
+    """
+    Remove the `### Paid Media Plan` block from a Markdown chunk.
+
+    The narrative formatter in chat/agents/paid_media.py emits a full markdown
+    block, including a pipe-delimited table, that the LLM may keep verbatim
+    inside the Budget Estimate section. _add_prose drops table rows silently,
+    so leaving the block in would yield a half-rendered duplicate. We strip
+    everything from the `### Paid Media Plan` heading through the next
+    `## ` (next H2) or `### ` (next H3) or end of text — whichever comes first.
+    """
+    if "### Paid Media Plan" not in text:
+        return text
+    lines = text.splitlines()
+    out: list = []
+    skipping = False
+    for line in lines:
+        s = line.strip()
+        if not skipping and s.startswith("### Paid Media Plan"):
+            skipping = True
+            continue
+        if skipping:
+            # Stop skipping at the next H2 or sibling H3.
+            if s.startswith("## ") or (s.startswith("### ") and not s.startswith("### Paid Media Plan")):
+                skipping = False
+                out.append(line)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def _paid_media_digital_table(channels: list) -> tuple:
+    """Build (headers, rows) for the paid-media digital channel table."""
+    headers = [
+        "Channel", "Spend", "Share", "CPM (low: high)",
+        "Impressions (mid)", "Est. Reach", "Est. Lift (pp)",
+    ]
+    rows = []
+    for c in channels:
+        cpm = f"${c['cpm_low']:.0f}: ${c['cpm_high']:.0f}"
+        imp_mid = f"{c['impressions']['mid']:,}"
+        reach   = f"{c['reach']:,}" if c.get("reach") else "n/a"
+        if c.get("saturated"):
+            reach += " (capped)"
+        if c.get("points_lift"):
+            lift = f"{c['points_lift']['low']:.2f}: {c['points_lift']['high']:.2f}"
+        else:
+            lift = "n/a"
+        rows.append([
+            c["label"],
+            _fmt_money(c["spend"]),
+            f"{c['share_pct']:.0f}%",
+            cpm,
+            imp_mid,
+            reach,
+            lift,
+        ])
+    return headers, rows
+
+
+def _render_paid_media_section(doc, paid_media: dict):
+    """
+    Render the paid_media dict from finance structured_data as a styled DOCX
+    subsection under the Budget Estimate H2. Uses _add_table for the digital
+    channel rollup, bullets for non-digital allocation, a paragraph for the
+    total persuasion lift, bullets for notes, and an italic source citation.
+    """
+    if not paid_media:
+        return
+
+    doc.add_heading("Paid Media Plan", level=3)
+
+    # Lead paragraph: tier, totals, in-language note.
+    district_bit = (
+        f" for {paid_media['district_label']}" if paid_media.get("district_label") else ""
+    )
+    lead = (
+        f"Tier: **{paid_media['tier_label']}**. Total program budget "
+        f"**{_fmt_money(paid_media['budget'])}**{district_bit}, of which "
+        f"**{_fmt_money(paid_media['digital_spend_total'])}** is paid digital and "
+        f"**{_fmt_money(paid_media['non_digital_spend_total'])}** is SMS and print."
+    )
+    _bold_runs(doc.add_paragraph(), lead)
+
+    if paid_media.get("in_language_pricing"):
+        _bold_runs(
+            doc.add_paragraph(),
+            f"In-language pricing applied for **{paid_media['language_intent']}**: "
+            f"22.5 percent under English CPM in the same DMA.",
+        )
+
+    # Digital channels table.
+    if paid_media.get("channels"):
+        _bold_runs(doc.add_paragraph(), "**Digital channels**")
+        h, r = _paid_media_digital_table(paid_media["channels"])
+        _add_table(doc, h, r)
+
+    # Non-digital allocation as bullets.
+    if paid_media.get("non_digital"):
+        _bold_runs(doc.add_paragraph(), "**Non-digital allocation (in same total)**")
+        for n in paid_media["non_digital"]:
+            _bold_runs(
+                doc.add_paragraph(style="List Bullet"),
+                f"{n['label']}: {_fmt_money(n['spend'])} ({n['share_pct']:.0f}%)",
+            )
+
+    # Total persuasion lift summary.
+    lift_low  = paid_media.get("total_points_lift_low")  or 0
+    lift_high = paid_media.get("total_points_lift_high") or 0
+    if lift_low or lift_high:
+        _bold_runs(
+            doc.add_paragraph(),
+            f"**Estimated total persuasion lift in target universe:** "
+            f"{lift_low:.2f} to {lift_high:.2f} percentage points "
+            f"(digital channels only; door knocks and direct mail are tracked separately "
+            f"in the operational program above).",
+        )
+
+    # Notes bullets.
+    if paid_media.get("notes"):
+        _bold_runs(doc.add_paragraph(), "**Notes**")
+        for note in paid_media["notes"]:
+            _bold_runs(doc.add_paragraph(style="List Bullet"), note)
+
+    # Italic source citation.
+    source = paid_media.get("source") or (
+        "Powerbuilder corpus file 07: paid-media digital benchmarks"
+    )
+    src_para = doc.add_paragraph()
+    src_run  = src_para.add_run(f"Source: {source}.")
+    src_run.italic = True
+
+    doc.add_paragraph()  # spacer
+
+
+# ---------------------------------------------------------------------------
 # Format handlers — unified signature: (synthesis, state, district_label)
 # _write_text ignores state and district_label via **_
 # ---------------------------------------------------------------------------
@@ -505,7 +645,14 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
         doc = Document()
     doc.add_heading(f"{district_label} — Political Program Plan", 0)
 
-    sections = _parse_sections(synthesis)
+    # If the finance entry contains a structured paid_media plan, the styled
+    # renderer below will draw it from the dict. Strip the inline markdown
+    # version from the synthesis so we don't get a half-rendered duplicate
+    # (the markdown table rows would be silently dropped by _add_prose).
+    paid_media_plan = (finance_entry or {}).get("paid_media") if finance_entry else None
+    synthesis_for_docx = _strip_inline_paid_media(synthesis) if paid_media_plan else synthesis
+
+    sections = _parse_sections(synthesis_for_docx)
 
     # Use PLAN_SECTION_ORDER when this is a plan doc; otherwise use whatever the LLM produced.
     ordered_titles = (
@@ -540,6 +687,8 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
                 if fec:
                     doc.add_heading("Historical FEC Spending (comparable cycles)", level=3)
                     _add_table(doc, *fec)
+                if paid_media_plan:
+                    _render_paid_media_section(doc, paid_media_plan)
 
     os.makedirs(EXPORTS_DIR, exist_ok=True)
     path = os.path.join(EXPORTS_DIR, _safe_filename(district_label, "docx"))
