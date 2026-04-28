@@ -133,7 +133,7 @@ prompt_text = captured.get("prompt", "")
 
 checks = [
     ("LANGUAGE DIRECTIVE present", "LANGUAGE DIRECTIVE" in prompt_text),
-    ("WRITE ALL FIVE ... IN SPANISH", "WRITE ALL FIVE MESSAGING SECTIONS IN SPANISH" in prompt_text),
+    ("WRITE ALL EIGHT ... IN SPANISH", "WRITE ALL EIGHT MESSAGING SECTIONS IN SPANISH" in prompt_text),
     ("Style hint present (t\u00fa-form)", "t\u00fa-form" in prompt_text),
     ("Markers preserved in prompt", "===CANVASSING_SCRIPT===" in prompt_text),
     ("messaging_node returned outputs", bool(result.get("research_results"))),

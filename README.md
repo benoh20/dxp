@@ -193,9 +193,10 @@ cd powerbuilder
 ./venv/bin/python scripts/_test_export_paid_media_docx.py         # 6 assertions
 ./venv/bin/python scripts/_test_persuadable_universe_wiring.py    # 9 assertions
 ./venv/bin/python scripts/_test_seed_verification.py              # 9 assertions
+./venv/bin/python scripts/_test_social_scripts.py                 # 74 assertions
 ```
 
-57 assertions total; all green on `demo-mode-and-hardening`.
+Across the full deterministic suite (18 files in `scripts/_test_*.py`), every test is green on `milestone-h-social-script-pack`.
 
 ## Demo data
 
@@ -222,6 +223,66 @@ Pull requests welcome. Please:
 - `/admin/` moved to a non-default path or restricted by IP
 - Static files served by `whitenoise` or a CDN
 - A real auth system in front of the demo password gate
+
+---
+
+## Research basis and design decisions
+
+Powerbuilder is built to be defensible to a c3 nonprofit board. Every interaction surface, every messaging format, and every default behavior traces back to peer-reviewed research, public field experiments, or published industry data. This appendix records the thought process behind milestones A through H so a reviewer can audit not just what the tool does, but why it does it that way.
+
+### Milestone A: demo mode and the deterministic baseline
+
+The demo gate (a `DEMO_MODE=1` flag that swaps live LLM calls for fixed, audience-safe outputs) exists because nonprofit-side demos cannot tolerate hallucinations or randomness on stage. The same logic that makes A/B testing rigorous in field experiments, treating the deliverable as the unit of analysis and removing variance you do not control, applies to a product demo. [Coppock, Hill, and Vavreck (APSR 2024)](https://www.cambridge.org/core/services/aop-cambridge-core/content/view/FF5BE6ED1553475F8321F7C4209357F7/S0003055423001387a.pdf) found that almost no political ad in their meta-analysis moved persuasion outside a tight band, which means the difference between a good demo and a bad one is reliability, not magic. Demo mode lets us promise reliability.
+
+### Milestone B: download cards and mobile polish
+
+We moved exports out of an inline blob and into named, dated download cards because the people who run independent field programs work on phones, in cars, between doors. The choice to surface every artifact (DOCX, CSV, XLSX) as a card, with size and timestamp, mirrors the CRM convention voter-contact staff already use. There is no formal citation here, the rationale is operational: a field director on a Saturday morning needs to grab a walk list in three taps, not scroll through a chat transcript.
+
+### Milestone C: mobile drawer and progressive disclosure
+
+All layout decisions on mobile follow from the observation in [Hackenburg and Margetts (PNAS 2024)](https://pnas.org/doi/10.1073/pnas.2403116121) that microtargeted persuasion produces null effects at scale, while the [TargetSmart Spanish-language analysis](https://targetsmart.com/research-shows-latinx-voters-want-ads-in-spanish-bolstering-the-case-for-more-spending/) shows in-language outreach delivers a 3.9 to 14.5 point turnout lift. Together these say: do not over-personalize copy, do over-invest in language access. The mobile drawer surfaces the language toggle as a first-class control rather than burying it in settings.
+
+### Milestone D: rerun chips and the plan panel
+
+The rerun chip pattern (one tap to regenerate a single agent's output without re-running the whole plan) is informed by [Hackenburg et al. (PNAS 2025)](https://pnas.org/doi/10.1073/pnas.2413443122), which shows LLM persuasion scales logarithmically with model size. Practically, that means the marginal value of regenerating one section with a stronger model is high, while the marginal cost of regenerating an entire plan is low information gain for high spend. Rerun chips let an organizer iterate on the messaging block without paying to re-derive the win number.
+
+### Milestone E: error chips and copy-to-clipboard
+
+Deep-canvassing research (see [Brock-Petroshius and Gilens, JOSI 2025](https://spssi.onlinelibrary.wiley.com/doi/10.1111/josi.70012)) shows that the highest-leverage moments in voter contact are conversational and unscripted, but only when the canvasser has a reliable script to fall back on. The copy-to-clipboard control on every script block, paired with explicit error chips when an agent fails, treats the script as a tool the field staffer owns, not a black box. Errors are surfaced inline so the user can decide whether to retry, swap formats, or proceed with partial output.
+
+### Milestone F: sidebar history, rename, drag-reorder, and source dedup
+
+Multi-session continuity matters because plans evolve over weeks. The [Schein et al. Outvote 2020 study](https://www.ssrn.com/abstract=3696179) found a CACE of about 8.3 percentage points for friend-to-friend texting, the strongest effect size in modern GOTV literature, but only when the relational asks were re-used and refined across cycles. The sidebar (with rename, drag-reorder, and source dedup) treats every plan as an asset that gets re-opened, not a one-off. Source dedup specifically prevents the corpus from showing the same memo five times when five agents all cited it, which preserves the reviewer's ability to audit citations.
+
+### Milestone G: tile config and plan groups
+
+The empty-state demo tiles are a guided onramp for first-time users. Each tile maps to a documented plan group (GA-07 youth, Spanish-language Gwinnett, AAPI multi-language, voter file upload). The plan-grouping logic, four agents minimum (`win_number`, `precincts`, `cost_calculator`, `messaging`) gates a full plan render, codifies the [LULAC 2024 "From Registration to Representation" framework](https://lulac.org/research/From_Registration_to_Representation_Latino_Turnout_as_Path_to_Power/): turnout requires geography, audience, message, and budget held in one frame. Surfacing tiles instead of a blank text box reduces the cold-start cost for an organizer who has never seen the tool before. The teal social-pack tile previewed in this milestone became the entry point for milestone H.
+
+### Milestone H: research-backed social media script pack
+
+Milestone H adds three new messaging formats (Meta post, YouTube script, TikTok or Reels script) on top of the existing five (canvass, phone, text, mail, digital). Each platform variant is shaped by platform-specific findings, not a generic "write a social post" prompt. The decision to ship three discrete formats rather than one flexible one comes from the [Wesleyan Media Project 2024 summary](https://mediaproject.wesleyan.edu/2024-summary-062425/), which documents that Meta and YouTube serve fundamentally different strategic functions in modern campaigns: Meta is a mobilization engine, YouTube is a persuasion engine. Treating them as one format would erase that distinction.
+
+**Meta post.** Mobilization frame, kitchen-table economic anchor, identity-as-noun call to action, body under 280 characters. The mobilization frame follows Wesleyan 2024 and the [Tech for Campaigns 2024 digital ads report](https://www.techforcampaigns.org/results/2024-digital-ads-report), which found mobilization-themed creative on issues like abortion access cost 1.8 to 5 times less per outcome than persuasion-themed creative on the same platforms. The kitchen-table economic frame comes from the [Priorities USA AAPI voter memo (2022)](https://priorities.org/wp-content/uploads/2022/10/AAPI-voter-memo-.pdf), which found pocketbook framing outperformed identity framing among AAPI voters by double digits. The identity-as-noun construction ("be a voter" rather than "go vote") comes from [Bryan, Walton, Rogers, and Dweck (PNAS 2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3150938/), which found a roughly 11-point turnout boost from the noun framing alone.
+
+**YouTube script.** A 60 to 90 second persuasion script with explicit timestamp markers (`0:00` hook, `0:05` evidence, `0:30` contrast, `0:55` ask). Length and structure are calibrated to Wesleyan 2024's finding that YouTube is the dominant persuasion channel and to the social-pressure mechanism documented in [Bond et al. (Nature 2012)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3834737/), which found that a 61-million-person Facebook social-pressure experiment moved roughly 340,000 votes, primarily through visible peer behavior rather than informational content. A YouTube script that ends on a peer-visible action ask is doing what the literature says works.
+
+**TikTok or Reels script.** A 15 to 30 second attention-first script with no party logos, lifestyle-wrapped politainment, and an ending question to invite duet or stitch responses. Format and tone come from [Chmel, Kim, Marshall, and Lubin (2024)](https://www.semanticscholar.org/paper/09e280bae78202b0f5ea04110691b8f6fd714dfe), which found that creator-led content outperforms traditional outreach by wide margins on short-form vertical platforms, and from the [Harvard Kennedy School Misinformation Review 2024 TikTok analysis](https://misinforeview.hks.harvard.edu/article/toxic-politics-and-tiktok-engagement-in-the-2024-u-s-election/), which documented that overtly partisan content was more likely to be flagged or down-ranked, while lifestyle-wrapped content reached comparable audiences without the penalty. Tech for Campaigns 2024 separately found that micro-influencer content delivered 5 to 9 times the engagement lift of equivalently spent paid media.
+
+**Length and hook checks.** Each generated variant is post-processed by `check_social_format()`, which annotates the output with a `*Format check:*` line if the body exceeds platform limits (Meta 900 characters, YouTube 2200, TikTok 900) or if the opener uses one of ten flat opener patterns ("In today's world," "Let me tell you about," etc.). The flat-opener list is informed by the attention-curve evidence in [Aggarwal et al. (Nature Human Behaviour 2023)](https://www.nature.com/articles/s41562-022-01487-4), a 2-million-person digital-ad experiment that found the first three seconds of creative drove the bulk of measured persuasion lift.
+
+**In-language captions.** Every variant supports a Spanish or Vietnamese caption toggle. The Spanish path is grounded in TargetSmart's 3.9 to 14.5 point turnout lift finding and in [Cisneros et al. (PNAS Nexus 2024)](https://pmc.ncbi.nlm.nih.gov/articles/PMC11561907/), which found that Spanish-language misinformation exposure raised vote-switching intent by 11 points; the rebuttal pattern in our caption template is structured to inoculate against the specific misinformation frames Cisneros et al. catalogued.
+
+### What we deliberately did not build
+
+Based on [Hackenburg and Margetts (PNAS 2024)](https://pnas.org/doi/10.1073/pnas.2403116121), Powerbuilder does not offer narrow microtargeting features (psychographic match, individual-level persuasion scores). The evidence for null effects is strong enough that shipping those features would be selling a result the literature does not support. We surface segment-level targeting (age cohort, language, geography, propensity) and stop there.
+
+### Future milestones (proposed)
+
+- Milestone I, creator and influencer match agent, picks up the Chmel et al. finding directly.
+- Milestone J, relational organizing pack, operationalizes the Schein et al. CACE.
+- Milestone K, A/B test scaffolding, builds on Coppock et al.
+- Milestone L, mobilization vs. persuasion mode toggle, formalizes the Wesleyan 2024 distinction across all formats.
+- Milestone M, Spanish-language misinformation rebuttal mode, extends Cisneros et al. into a first-class agent.
 
 ---
 

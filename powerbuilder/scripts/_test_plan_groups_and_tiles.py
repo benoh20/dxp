@@ -239,7 +239,7 @@ def test_chat_html_group_css():
 def test_demo_tiles_config():
     n = 0
     tiles = demo_tiles.get_demo_tiles()
-    assert len(tiles) == 5, f"expected 5 default tiles, got {len(tiles)}"
+    assert len(tiles) == 6, f"expected 6 default tiles, got {len(tiles)}"
     n += 1
 
     required = {"id", "chip", "chip_kind", "headline", "preview", "prompt"}
@@ -258,7 +258,7 @@ def test_demo_tiles_config():
 
     # Specific tiles known to exist (acts as a smoke test against accidental drops)
     for needed in ("gwinnett-gotv-latinx", "win-number-ga07-midterm",
-                   "voterfile-segment-and-match"):
+                   "voterfile-segment-and-match", "social-pack-ga07-youth"):
         assert needed in ids, f"missing expected tile id {needed!r}"
         n += 1
 

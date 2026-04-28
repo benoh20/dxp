@@ -39,7 +39,7 @@ from typing import TypedDict
 # Allowed chip color variants. Each maps to a .demo-tile-chip--<kind> CSS
 # rule already shipped in chat.html. If you want a new color, add the rule
 # in the stylesheet first, then add the kind here.
-CHIP_KINDS: tuple[str, ...] = ("plan", "win", "opp", "lang", "vf")
+CHIP_KINDS: tuple[str, ...] = ("plan", "win", "opp", "lang", "vf", "social")
 
 
 class DemoTile(TypedDict):
@@ -97,6 +97,20 @@ DEMO_TILES: list[DemoTile] = [
         "prompt": (
             "Draft a Vietnamese-language text message to AAPI voters in "
             "Gwinnett about early voting locations and hours."
+        ),
+    },
+    {
+        "id":        "social-pack-ga07-youth",
+        "chip":      "Social pack",
+        "chip_kind": "social",
+        "headline":  "Social media pack for GA-07 youth turnout",
+        "preview":   "Meta mobilization, YouTube persuasion, TikTok hook, grounded in research.",
+        "prompt": (
+            "Build a social media pack for Georgia's 7th Congressional "
+            "District youth turnout (18 to 29). Generate the Meta post, "
+            "YouTube script, and TikTok script alongside the standard "
+            "canvassing and phone outputs. Lead with cost-of-living framing "
+            "where it fits the research."
         ),
     },
     {

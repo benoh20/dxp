@@ -47,6 +47,11 @@ TEMPLATE_FILES = {
     "text_script":       "text_script_template.md",
     "mail_narrative":    None,
     "digital_copy":      "digital_copy_template.md",
+    # Milestone H: platform-specific social media variants. Templates are
+    # optional; falling back to FORMAT_DESCRIPTIONS gives sensible defaults.
+    "meta_post":         None,
+    "youtube_script":    None,
+    "tiktok_script":     None,
 }
 
 # Default structural descriptions used when no template file exists.
@@ -82,6 +87,53 @@ FORMAT_DESCRIPTIONS = {
         "4 digital ad copy variations (Variation A through D), "
         "each under 30 words, suitable for Facebook, Instagram, and display ads."
     ),
+    # ---- Milestone H: research-backed platform-shaped social variants ----
+    # Each variant maps to a specific finding in the literature. See the
+    # 'Research basis' section of the README for the full citation list.
+    "meta_post": (
+        "A Facebook/Instagram MOBILIZATION post (Wesleyan Media Project 2024 "
+        "shows Meta is overwhelmingly used for action and GOTV, not persuasion). "
+        "Format:\n"
+        "- 1-line scroll-stopping headline (under 90 characters)\n"
+        "- 2 to 3 sentence body, kitchen-table economic frame where possible "
+        "  (TFC 2024: abortion-only mobilization framing was 1.8x to 5x more "
+        "  expensive per conversion than top creative)\n"
+        "- Single concrete CTA using identity-as-noun framing where it fits "
+        "  ('be a voter', 'join the X for Y', not 'vote', 'help us'); see "
+        "  Bryan, Walton, Rogers and Dweck, PNAS 2011\n"
+        "- One link placeholder: [LINK]\n"
+        "Total length under 280 characters in the post body."
+    ),
+    "youtube_script": (
+        "A YouTube PERSUASION script, 60 to 90 seconds spoken (Wesleyan 2024: "
+        "YouTube carried more issue and persuasion content than Meta and was "
+        "closer to traditional TV in function). Format:\n"
+        "- [0:00 to 0:05] HOOK: a question or contrast that names the stake "
+        "  for this voter\n"
+        "- [0:05 to 0:30] EVIDENCE: 2 to 3 specific findings from the research "
+        "  above with attribution\n"
+        "- [0:30 to 0:55] CONTRAST or STORY: a brief grounded comparison or "
+        "  one short voter story rendered in plain language\n"
+        "- [0:55 to 1:30] ASK: action specific to this district, with a date "
+        "  if available\n"
+        "Include speaker direction in [brackets] sparingly."
+    ),
+    "tiktok_script": (
+        "A TikTok or Reels ATTENTION script, 15 to 30 seconds (Chmel, Kim, "
+        "Marshall and Lubin 2024: lifestyle-wrapped political content from "
+        "creators outperformed traditional outreach; politainment frame works "
+        "better than overtly political delivery for under-35 audiences). "
+        "Format:\n"
+        "- [HOOK 0 to 1.5s] open with a curiosity gap or strong visual cue, "
+        "  no party logos\n"
+        "- [PAYOFF 1.5 to 20s] one specific finding from the research, "
+        "  delivered in conversational first-person\n"
+        "- [TURN 20 to 28s] reframe to the viewer's stake (their district, "
+        "  their cohort, their cost-of-living)\n"
+        "- [CTA 28 to 30s] end on a question or a low-friction ask (follow, "
+        "  share, check registration); avoid imperative 'vote for X' phrasing\n"
+        "Caption: under 150 characters, 2 to 4 hashtags max, no party tags."
+    ),
 }
 
 # Maps ISO 639-1 language codes to a (display_name, native_call_to_arms) pair.
@@ -107,6 +159,10 @@ SECTION_MARKERS = {
     "text_script":       "===TEXT_SCRIPT===",
     "mail_narrative":    "===MAIL_NARRATIVE===",
     "digital_copy":      "===DIGITAL_COPY===",
+    # Milestone H: social platform variants
+    "meta_post":         "===META_POST===",
+    "youtube_script":    "===YOUTUBE_SCRIPT===",
+    "tiktok_script":     "===TIKTOK_SCRIPT===",
 }
 
 # Human-readable labels for the research_results header of each output
@@ -116,6 +172,10 @@ FORMAT_LABELS = {
     "text_script":       "TEXT SCRIPT (SMS)",
     "mail_narrative":    "MAIL NARRATIVE",
     "digital_copy":      "DIGITAL COPY BLOCK",
+    # Milestone H: social platform variants
+    "meta_post":         "META POST (Mobilization)",
+    "youtube_script":    "YOUTUBE SCRIPT (Persuasion)",
+    "tiktok_script":     "TIKTOK SCRIPT (Attention)",
 }
 
 # ---------------------------------------------------------------------------
@@ -273,6 +333,77 @@ def _summarize_demographics(precincts: list) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Milestone H: format checker for the social variants
+# ---------------------------------------------------------------------------
+
+# Approximate length budgets per platform (chars). These are deliberately
+# generous and are warnings, not hard rejections — the LLM occasionally needs
+# breathing room for non-English variants which run longer.
+SOCIAL_LENGTH_LIMITS: dict[str, int] = {
+    "meta_post":      900,    # body + CTA + 1 line + a little slack
+    "youtube_script": 2200,   # ~90 seconds of conversational copy plus stage directions
+    "tiktok_script":  900,    # 30-second script plus caption block
+}
+
+# Phrases that suggest the script does NOT open with a hook. We're checking
+# the FIRST 60 characters of the script body (skipping any leading bracket
+# direction like '[0:00 to 0:05]').
+_FLAT_OPENERS: tuple[str, ...] = (
+    "hello", "hi there", "hi everyone", "my name is", "i'm a", "i am a",
+    "in this video", "today we", "this video", "welcome to", "thanks for",
+)
+
+
+def _strip_leading_direction(text: str) -> str:
+    """Drop a leading [bracketed direction] and any whitespace so the hook check
+    looks at actual spoken/visible copy, not stage cues."""
+    stripped = text.lstrip()
+    if stripped.startswith("["):
+        close = stripped.find("]")
+        if close != -1:
+            stripped = stripped[close + 1 :].lstrip()
+    return stripped
+
+
+def check_social_format(sections: dict) -> dict[str, list[str]]:
+    """
+    Inspect the parsed social sections and return a dict of
+    {format_key: [warning, ...]} for any variant that drifts from format.
+
+    Checks:
+      - length: warns if the section is materially longer than the platform
+        budget (TikTok scripts that run 4 paragraphs, etc.)
+      - hook: warns if a TikTok or YouTube script opens with a flat 'hello,
+        my name is' style intro instead of a curiosity hook
+
+    Empty or missing sections are silently skipped — the caller already
+    handles the 'LLM returned no parseable content' case.
+    """
+    warnings: dict[str, list[str]] = {}
+    for key, limit in SOCIAL_LENGTH_LIMITS.items():
+        content = (sections.get(key) or "").strip()
+        if not content:
+            continue
+        section_warnings: list[str] = []
+
+        if len(content) > limit:
+            section_warnings.append(
+                f"runs {len(content)} chars, target under {limit}"
+            )
+
+        if key in ("tiktok_script", "youtube_script"):
+            opener = _strip_leading_direction(content)[:60].lower()
+            if any(opener.startswith(flat) for flat in _FLAT_OPENERS):
+                section_warnings.append(
+                    "opens with a flat intro (consider a curiosity hook in the first beat)"
+                )
+
+        if section_warnings:
+            warnings[key] = section_warnings
+    return warnings
+
+
 def _parse_sections(raw: str) -> dict:
     """
     Split the LLM response on SECTION_MARKERS into a dict of {format: content}.
@@ -375,6 +506,10 @@ def messaging_node(state: AgentState) -> dict:
     text_instruction       = _get_format_instruction("text_script")
     mail_instruction       = _get_format_instruction("mail_narrative")
     digital_instruction    = _get_format_instruction("digital_copy")
+    # Milestone H: research-backed social platform variants
+    meta_instruction       = _get_format_instruction("meta_post")
+    youtube_instruction    = _get_format_instruction("youtube_script")
+    tiktok_instruction     = _get_format_instruction("tiktok_script")
 
     # -----------------------------------------------------------------------
     # 3. Single LLM call — all five formats, separated by section markers
@@ -389,7 +524,7 @@ def messaging_node(state: AgentState) -> dict:
     else:
         language_directive = (
             f"\u2501\u2501\u2501 LANGUAGE DIRECTIVE — NON-NEGOTIABLE \u2501\u2501\u2501\n"
-            f"WRITE ALL FIVE MESSAGING SECTIONS IN {language_name.upper()}.\n"
+            f"WRITE ALL EIGHT MESSAGING SECTIONS IN {language_name.upper()}.\n"
             f"Section headers, markers, and instructions stay in English; "
             f"all script content (greetings, talking points, CTAs, dialogue, "
             f"objection handling, ad copy) must be in {language_name}.\n"
@@ -419,7 +554,7 @@ RESEARCH FINDINGS (your only permitted source of messaging content):
 {research_context}
 
 ━━━ OUTPUT INSTRUCTIONS ━━━
-Generate all five sections below. Each section must:
+Generate all eight sections below. Each section must:
 1. Be grounded exclusively in the research findings above.
 2. Be tailored to the demographic profile of the target precincts.
 3. Close with this exact recency note in italics:
@@ -442,6 +577,15 @@ Do not rename, reorder, or omit any marker.
 
 {SECTION_MARKERS["digital_copy"]}
 {digital_instruction}
+
+{SECTION_MARKERS["meta_post"]}
+{meta_instruction}
+
+{SECTION_MARKERS["youtube_script"]}
+{youtube_instruction}
+
+{SECTION_MARKERS["tiktok_script"]}
+{tiktok_instruction}
 """
 
     try:
@@ -475,8 +619,33 @@ Do not rename, reorder, or omit any marker.
             "active_agents": ["messaging"],
         }
 
+    # Milestone H: post-process social variants for hook + length checks.
+    # Findings are warnings only — they don't block the output. They get
+    # appended to the formatted footer so a reviewer can see at a glance
+    # which variants drifted from format.
+    social_warnings = check_social_format(sections)
+    if social_warnings:
+        logger.info(
+            f"MessagingAgent: social variant format warnings: {social_warnings}"
+        )
+        # Annotate the matching formatted output with a small italic note.
+        annotated: list[str] = []
+        for chunk in formatted_outputs:
+            extra = ""
+            for fmt_key, warns in social_warnings.items():
+                label = FORMAT_LABELS.get(fmt_key, "")
+                if label and f"MESSAGING OUTPUT: {label}" in chunk:
+                    extra = (
+                        "\n\n*Format check:* "
+                        + "; ".join(warns)
+                        + "."
+                    )
+                    break
+            annotated.append(chunk + extra if extra else chunk)
+        formatted_outputs = annotated
+
     logger.info(
-        f"MessagingAgent: Generated {len(formatted_outputs)}/5 messaging formats "
+        f"MessagingAgent: Generated {len(formatted_outputs)}/8 messaging formats "
         f"for {district_label} in {language_name} using research dated as "
         f"recently as {most_recent_date}."
     )

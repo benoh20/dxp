@@ -82,8 +82,8 @@ def main() -> int:
         if 'class="demo-carousel"' not in html:
             failures.append(f"[{label}] demo-carousel container missing")
         tile_count = len(re.findall(r'class="demo-tile"', html))
-        if tile_count != 5:
-            failures.append(f"[{label}] expected 5 demo-tile elements, got {tile_count}")
+        if tile_count != 6:
+            failures.append(f"[{label}] expected 6 demo-tile elements, got {tile_count}")
 
         # Each chip variant + label present.
         for chip_class, chip_text in EXPECTED_CHIPS:
@@ -94,8 +94,8 @@ def main() -> int:
 
     # 3. Each tile has a data-prompt attribute with non-empty value.
     prompts = re.findall(r'data-prompt="([^"]+)"', html_demo_on)
-    if len(prompts) != 5:
-        failures.append(f"expected 5 data-prompt attributes, got {len(prompts)}")
+    if len(prompts) != 6:
+        failures.append(f"expected 6 data-prompt attributes, got {len(prompts)}")
     for i, p in enumerate(prompts):
         if len(p.strip()) < 10:
             failures.append(f"data-prompt[{i}] is too short to be a real prompt: {p!r}")
