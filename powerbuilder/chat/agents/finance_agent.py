@@ -38,6 +38,11 @@ from langchain_openai import ChatOpenAI
 from ..utils.data_fetcher import DataFetcher
 from ..utils.district_standardizer import GeographyStandardizer
 from .state import AgentState
+from .paid_media import (
+    estimate_paid_media,
+    format_paid_media_section,
+    query_mentions_paid_media,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -646,18 +651,46 @@ def finance_node(state: AgentState) -> dict:
                 f"budget={'${:,.0f}'.format(budget_available_vf) if budget_available_vf else 'not specified'}"
             )
 
+            # Paid-media estimate (file 07): triggered when a budget is set AND
+            # either the user asked for paid media OR the budget is large
+            # enough that digital is intrinsic to the program (>= $25K).
+            paid_media_vf = None
+            paid_media_section_vf = ""
+            if budget_available_vf and (
+                budget_available_vf >= 25_000
+                or query_mentions_paid_media(state.get("query", ""))
+            ):
+                paid_media_vf = estimate_paid_media(
+                    budget=budget_available_vf,
+                    query=state.get("query", ""),
+                    language_intent=state.get("language_intent"),
+                    district_label="Voter File Universe",
+                    target_universe=universe_size,
+                )
+                if paid_media_vf:
+                    paid_media_section_vf = format_paid_media_section(paid_media_vf)
+
+            narrative_combined_vf = (
+                narrative_vf + "\n\n" + paid_media_section_vf
+                if paid_media_section_vf else narrative_vf
+            )
+
+            structured_vf = {
+                "agent":          "finance",
+                "mode":           "voter_file",
+                "data_source":    "unit_cost_only",
+                "universe_size":  universe_size,
+                "unit_costs":     unit_costs_vf,
+                "budget_available": budget_available_vf,
+                "vf_budget":      vf_budget,
+                "budget_program": budget_program_vf,
+            }
+            if paid_media_vf:
+                structured_vf["paid_media"] = paid_media_vf
+
             return {
-                "structured_data": [{
-                    "agent":          "finance",
-                    "mode":           "voter_file",
-                    "data_source":    "unit_cost_only",
-                    "universe_size":  universe_size,
-                    "unit_costs":     unit_costs_vf,
-                    "budget_available": budget_available_vf,
-                    "vf_budget":      vf_budget,
-                    "budget_program": budget_program_vf,
-                }],
-                "research_results": [narrative_vf],
+                "structured_data": [structured_vf],
+                "research_results": [narrative_combined_vf],
                 "active_agents":    ["cost_calculator"],
             }
 
@@ -870,6 +903,45 @@ BUDGET: [number or NONE]
     )
 
     # -----------------------------------------------------------------------
+    # 7b. Paid-media plan from file 07 (CPMs, frequency caps, channel mix)
+    # Triggered when a budget is set AND the user asked for paid media OR the
+    # budget is large enough that digital is intrinsic (>= $25K).
+    # -----------------------------------------------------------------------
+    paid_media = None
+    paid_media_section = ""
+    if budget_available and (
+        budget_available >= 25_000
+        or query_mentions_paid_media(state.get("query", ""))
+    ):
+        # Use win-number-derived persuadable universe when available; falls back
+        # to projected_turnout, then None (no saturation cap applied).
+        wn_entry = next(
+            (d for d in state.get("structured_data", []) if d.get("agent") == "win_number"),
+            None,
+        )
+        target_universe_pm = None
+        if wn_entry:
+            target_universe_pm = (
+                wn_entry.get("persuadable_universe")
+                or wn_entry.get("projected_turnout")
+                or wn_entry.get("voter_universe_cvap")
+            )
+        paid_media = estimate_paid_media(
+            budget=budget_available,
+            query=state.get("query", ""),
+            language_intent=state.get("language_intent"),
+            district_label=district_label,
+            target_universe=target_universe_pm,
+        )
+        if paid_media:
+            paid_media_section = format_paid_media_section(paid_media)
+
+    narrative_combined = (
+        narrative + "\n\n" + paid_media_section
+        if paid_media_section else narrative
+    )
+
+    # -----------------------------------------------------------------------
     # 8. Write to whiteboard
     # -----------------------------------------------------------------------
     structured_entry = {
@@ -893,10 +965,12 @@ BUDGET: [number or NONE]
             else "unit_cost_only"
         ),
     }
+    if paid_media:
+        structured_entry["paid_media"] = paid_media
 
     result = {
         "structured_data":  [structured_entry],
-        "research_results": [narrative],
+        "research_results": [narrative_combined],
         "active_agents":    ["cost_calculator"],
     }
     if errors_out:
