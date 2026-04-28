@@ -10,11 +10,27 @@ Usage (from /powerbuilder):
     python scripts/seed_best_practices.py                  # seed all files
     python scripts/seed_best_practices.py --dry-run        # parse + chunk, no upload
     python scripts/seed_best_practices.py --force-reindex  # delete then re-upload
+    python scripts/seed_best_practices.py --skip-verify    # skip post-upload checks
+
+If the configured Pinecone index does not yet exist, the script creates it as
+a serverless cosine index (1536 dims for text-embedding-3-small) in the
+region specified by PINECONE_CLOUD/PINECONE_REGION (defaults: aws/us-east-1).
+
+After upsert, the script verifies (a) the namespace vector count matches the
+upload size, (b) a known vector ID can be fetched back, and (c) a smoke-test
+query returns the expected source file as the top hit. Any failed check
+exits non-zero so CI can catch a half-seeded index.
 
 Required env (loaded from .env):
     OPENAI_API_KEY
     PINECONE_API_KEY
     OPENAI_PINECONE_INDEX_NAME
+
+Optional env:
+    EMBEDDING_MODEL          (default: text-embedding-3-small)
+    EMBEDDING_DIMENSIONS     (default: 1536)
+    PINECONE_CLOUD           (default: aws)
+    PINECONE_REGION          (default: us-east-1)
 
 Falls back to writing a local index at scripts/.local_corpus_index.json if
 PINECONE_API_KEY is missing, so the demo can run fully offline. The
@@ -28,6 +44,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -249,9 +266,125 @@ def collect_documents() -> list[dict]:
 # Pinecone path
 # ---------------------------------------------------------------------------
 
-def upsert_to_pinecone(docs: list[dict], force_reindex: bool) -> None:
+# langchain_pinecone uses sentinel "__default__" but the raw SDK uses "" for
+# the default namespace. Keep this constant module-level so both upsert and
+# verification paths agree.
+DEFAULT_NS = ""
+INDEX_READY_TIMEOUT_SECS = 120
+
+# Smoke-test queries: each maps a representative natural-language query to the
+# corpus file that should dominate the top results. If a top-3 match doesn't
+# include the expected file, verification fails. Keep these tied to corpus
+# files we expect to keep around.
+SMOKE_TEST_QUERIES: list[tuple[str, str]] = [
+    ("Spanish door knock Gwinnett", "01_latinx_gotv_field_playbook.md"),
+    ("rural turf cut drive time", "10_rural_and_exurban_organizing.md"),
+    ("Vietnamese Korean voter outreach", "08_aapi_multilanguage_outreach.md"),
+    ("Gen Z text message script", "05_gen_z_outreach.md"),
+]
+
+
+def _ensure_index(pc, index_name: str, dimensions: int) -> None:
+    """
+    Create the Pinecone index if it does not exist and wait for it to be ready.
+
+    Uses serverless cosine on aws/us-east-1 by default; override with
+    PINECONE_CLOUD / PINECONE_REGION env vars.
+    """
+    existing = [idx.name for idx in pc.list_indexes()]
+    if index_name in existing:
+        return
+
+    from pinecone import ServerlessSpec
+    cloud = os.getenv("PINECONE_CLOUD", "aws")
+    region = os.getenv("PINECONE_REGION", "us-east-1")
+    print(f"Creating index '{index_name}' ({dimensions} dims, cosine, {cloud}/{region})...")
+    pc.create_index(
+        name=index_name,
+        dimension=dimensions,
+        metric="cosine",
+        spec=ServerlessSpec(cloud=cloud, region=region),
+    )
+
+    deadline = time.time() + INDEX_READY_TIMEOUT_SECS
+    while time.time() < deadline:
+        info = pc.describe_index(index_name)
+        if getattr(info.status, "ready", False):
+            print(f"  Index '{index_name}' is ready.")
+            return
+        time.sleep(2)
+    raise RuntimeError(
+        f"Index '{index_name}' did not become ready within {INDEX_READY_TIMEOUT_SECS}s."
+    )
+
+
+def _verify_count(index, expected: int) -> int:
+    """
+    Poll describe_index_stats until the default namespace count reaches
+    `expected` (or stops growing). Returns the observed count.
+    Pinecone stats can lag a few seconds behind upsert.
+    """
+    deadline = time.time() + 30
+    last = -1
+    while time.time() < deadline:
+        stats = index.describe_index_stats()
+        ns = stats.namespaces or {}
+        entry = ns.get(DEFAULT_NS) or ns.get("__default__")
+        count = getattr(entry, "vector_count", 0) if entry else 0
+        if count >= expected:
+            return count
+        if count == last:
+            # Stats stopped moving; bail with what we have.
+            time.sleep(2)
+        last = count
+        time.sleep(2)
+    return last if last >= 0 else 0
+
+
+def _verify_sample_fetch(index, sample_id: str) -> bool:
+    """Confirm a known vector ID round-trips through fetch."""
+    try:
+        result = index.fetch(ids=[sample_id], namespace=DEFAULT_NS)
+        vectors = getattr(result, "vectors", None) or {}
+        return sample_id in vectors
+    except Exception as exc:
+        print(f"  sample fetch error: {exc}")
+        return False
+
+
+def _verify_smoke_queries(index, embeddings) -> list[tuple[str, str, bool, str]]:
+    """
+    Run each smoke-test query and check that the expected source file appears
+    in the top 3 hits. Returns a list of (query, expected_file, passed, top_file).
+    """
+    results: list[tuple[str, str, bool, str]] = []
+    for query, expected_file in SMOKE_TEST_QUERIES:
+        try:
+            vec = embeddings.embed_query(query)
+            res = index.query(
+                vector=vec, top_k=3, include_metadata=True, namespace=DEFAULT_NS,
+            )
+            top_files = [
+                (m.metadata or {}).get("source_file", "?") for m in res.matches
+            ]
+            passed = expected_file in top_files
+            top_file = top_files[0] if top_files else "?"
+        except Exception as exc:
+            passed = False
+            top_file = f"error: {exc}"
+        results.append((query, expected_file, passed, top_file))
+    return results
+
+
+def upsert_to_pinecone(
+    docs: list[dict],
+    force_reindex: bool,
+    skip_verify: bool = False,
+) -> bool:
     """
     Embed every chunk and upsert to OPENAI_PINECONE_INDEX_NAME / __default__.
+
+    Returns True if upsert (and verification, if enabled) succeeded.
     """
     from langchain_openai import OpenAIEmbeddings
     from pinecone import Pinecone
@@ -263,13 +396,13 @@ def upsert_to_pinecone(docs: list[dict], force_reindex: bool) -> None:
             "PINECONE_API_KEY and OPENAI_PINECONE_INDEX_NAME must be set."
         )
 
-    pc = Pinecone(api_key=api_key)
-    index = pc.Index(index_name)
-    embeddings = OpenAIEmbeddings(model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"))
+    embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    embedding_dims = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
 
-    # langchain_pinecone uses sentinel "__default__" but the raw SDK
-    # uses "" for the default namespace.
-    DEFAULT_NS = ""
+    pc = Pinecone(api_key=api_key)
+    _ensure_index(pc, index_name, embedding_dims)
+    index = pc.Index(index_name)
+    embeddings = OpenAIEmbeddings(model=embedding_model)
 
     if force_reindex:
         ids_to_delete = [d["id"] for d in docs]
@@ -282,7 +415,7 @@ def upsert_to_pinecone(docs: list[dict], force_reindex: bool) -> None:
                 # If the IDs don't exist yet (first run), Pinecone may 404. Ignore.
                 print(f"  delete batch skipped: {exc}")
 
-    print(f"Embedding {len(docs)} chunks with text-embedding-3-small...")
+    print(f"Embedding {len(docs)} chunks with {embedding_model}...")
     texts = [d["text"] for d in docs]
     vectors = embeddings.embed_documents(texts)
 
@@ -296,6 +429,39 @@ def upsert_to_pinecone(docs: list[dict], force_reindex: bool) -> None:
         index.upsert(vectors=payload[i:i + 100], namespace=DEFAULT_NS)
 
     print(f"Done. Upserted {len(payload)} vectors.")
+
+    if skip_verify:
+        print("Skip-verify flag set: skipping post-upload checks.")
+        return True
+
+    return _run_post_upload_verification(index, embeddings, docs)
+
+
+def _run_post_upload_verification(index, embeddings, docs: list[dict]) -> bool:
+    """
+    Three checks: count match, sample fetch, smoke-test queries.
+    Prints a summary and returns True only if every check passes.
+    """
+    print("\nVerifying upload...")
+    expected = len(docs)
+    count = _verify_count(index, expected)
+    count_ok = count >= expected
+    print(f"  [{'OK' if count_ok else 'FAIL'}] vector count: {count} / {expected}")
+
+    sample_id = docs[0]["id"] if docs else ""
+    fetch_ok = bool(sample_id) and _verify_sample_fetch(index, sample_id)
+    print(f"  [{'OK' if fetch_ok else 'FAIL'}] sample fetch: id={sample_id}")
+
+    smoke_results = _verify_smoke_queries(index, embeddings)
+    smoke_ok = all(passed for _, _, passed, _ in smoke_results)
+    print("  Smoke-test queries:")
+    for query, expected_file, passed, top_file in smoke_results:
+        marker = "OK" if passed else "FAIL"
+        print(f"    [{marker}] {query!r} -> top={top_file} (expected {expected_file})")
+
+    all_ok = count_ok and fetch_ok and smoke_ok
+    print(f"\nVerification: {'PASS' if all_ok else 'FAIL'}")
+    return all_ok
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +501,8 @@ def main() -> int:
                         help="Delete existing vectors with these IDs before upsert.")
     parser.add_argument("--local-only", action="store_true",
                         help="Skip Pinecone, write only the local fallback index.")
+    parser.add_argument("--skip-verify", action="store_true",
+                        help="Skip post-upload count check, sample fetch, and smoke-test queries.")
     args = parser.parse_args()
 
     docs = collect_documents()
@@ -363,11 +531,19 @@ def main() -> int:
         return 0
 
     try:
-        upsert_to_pinecone(docs, force_reindex=args.force_reindex)
+        verified = upsert_to_pinecone(
+            docs,
+            force_reindex=args.force_reindex,
+            skip_verify=args.skip_verify,
+        )
     except Exception as exc:
         print(f"Pinecone upload failed: {exc}")
         print("Local fallback index is still available.")
         return 1
+
+    if not verified:
+        print("Verification failed: index may be incomplete or stale.")
+        return 2
 
     return 0
 

@@ -168,6 +168,8 @@ python bulk_upload.py research_memos/ --force-reindex
 
 Best-practices Markdown files in `tool_templates/best_practices/` are also seeded into Pinecone via `python scripts/seed_best_practices.py`. These are the curated field playbooks the messaging agent leans on when no client-specific corpus is available. Adding a new file is a drop-in: write a frontmatter block (source, date, document type, topics), the body, then re-run the seed script. The script prints chunks-per-file and writes both a Pinecone upload (when reachable) and a local fallback index for development.
 
+The seed script is self-bootstrapping. If `OPENAI_PINECONE_INDEX_NAME` does not yet exist on the configured Pinecone account, the script creates it as a serverless cosine index (1536 dims, aws/us-east-1 by default; override with `PINECONE_CLOUD` and `PINECONE_REGION`) and waits for it to be ready before upserting. After upsert, it verifies three things: (a) the namespace vector count matches the upload size, (b) a known vector ID round-trips through fetch, and (c) a small set of smoke-test queries each return the expected source file in the top 3. Failed checks exit non-zero, so a half-seeded index never goes unnoticed. Pass `--skip-verify` to bypass post-upload checks (not recommended).
+
 ## Running tests
 
 ```bash
@@ -190,9 +192,10 @@ cd powerbuilder
 ./venv/bin/python scripts/_test_paid_media_estimator.py           # 11 assertions
 ./venv/bin/python scripts/_test_export_paid_media_docx.py         # 6 assertions
 ./venv/bin/python scripts/_test_persuadable_universe_wiring.py    # 9 assertions
+./venv/bin/python scripts/_test_seed_verification.py              # 9 assertions
 ```
 
-48 assertions total; all green on `demo-mode-and-hardening`.
+57 assertions total; all green on `demo-mode-and-hardening`.
 
 ## Demo data
 
