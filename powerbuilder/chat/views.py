@@ -32,6 +32,7 @@ from functools import wraps
 from . import progress
 from .render_helpers import (
     extract_sources,
+    friendly_error,
     is_plan_run,
     c3_footer_text,
     agent_pill_label,
@@ -39,6 +40,9 @@ from .render_helpers import (
     enrich_downloads,
     plan_outline,
     prefix_heading_ids,
+    relative_time,
+    sanitize_errors,
+    scrub_answer_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,11 +145,39 @@ def chat_view(request):
         if conv:
             current_messages = conv.get("messages", [])
 
+    # Milestone F: attach a relative-time label to each conv for the sidebar.
+    # Backfill created_at on older session entries (pre-Milestone-F) by
+    # parsing the legacy timestamp string, falling back to 'now' if it can't
+    # be parsed so we never crash on stale session shapes.
+    now_ts = int(time.time())
+    enriched: list[dict] = []
+    for c in conversations:
+        created = c.get("created_at")
+        if not isinstance(created, (int, float)):
+            created = _parse_legacy_timestamp(c.get("timestamp"), now_ts)
+            c["created_at"] = created  # persist the backfill
+        view_c = dict(c)
+        view_c["time_label"] = relative_time(created, now_ts)
+        enriched.append(view_c)
+    # Persist the backfill so subsequent requests skip it
+    request.session["conversations"] = conversations
+    request.session.modified = True
+
     return render(request, "chat.html", {
-        "conversations":    conversations,
+        "conversations":    enriched,
         "current_messages": current_messages,
         "current_conv_id":  current_id,
     })
+
+
+def _parse_legacy_timestamp(ts_str: str | None, fallback: int) -> int:
+    """Best-effort parse of the old '%Y-%m-%d %H:%M' timestamp into Unix epoch."""
+    if not ts_str:
+        return fallback
+    try:
+        return int(time.mktime(time.strptime(ts_str, "%Y-%m-%d %H:%M")))
+    except (ValueError, TypeError):
+        return fallback
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +243,12 @@ def send_message_view(request):
     generated_file_path = result.get("generated_file_path")
     errors              = result.get("errors", [])
 
+    # Milestone E: scrub raw agent-error lines the synthesizer sometimes echoes
+    # into the answer text, and convert the structured errors list into
+    # friendly user-facing messages.
+    final_answer = scrub_answer_text(final_answer)
+    errors       = sanitize_errors(errors)
+
     # Bubble id (Milestone D): used to namespace heading anchors so side-panel
     # nav links jump to the right bubble even when multiple plans share section
     # titles. Also used as the data-attr the edit-and-rerun JS targets.
@@ -263,10 +301,11 @@ def send_message_view(request):
     if conv is None:
         current_id = str(uuid.uuid4())
         conv = {
-            "id":        current_id,
-            "title":     auto_title(query),
-            "timestamp": time.strftime("%Y-%m-%d %H:%M"),
-            "messages":  [],
+            "id":         current_id,
+            "title":      auto_title(query),
+            "timestamp":  time.strftime("%Y-%m-%d %H:%M"),
+            "created_at": int(time.time()),  # Milestone F: drives sidebar relative_time()
+            "messages":   [],
         }
         conversations.insert(0, conv)
         conversations = conversations[:MAX_CONVERSATIONS]
@@ -415,7 +454,13 @@ def stream_query_view(request):
             worker_thread.join(timeout=5.0)
 
             if holder["error"]:
-                yield _format_sse({"type": "error", "label": holder["error"]})
+                # Milestone E: map raw exceptions (e.g. AuthenticationError
+                # from the LLM client) to a short, human label before it
+                # reaches the EventSource handler in chat.html.
+                yield _format_sse({
+                    "type": "error",
+                    "label": friendly_error(holder["error"]),
+                })
                 return
 
             result = holder["result"] or {}
@@ -440,6 +485,11 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     active_agents       = result.get("active_agents", [])
     generated_file_path = result.get("generated_file_path")
     errors              = result.get("errors", [])
+
+    # Milestone E: same scrubbing as the HTMX path so SSE clients see the
+    # friendly error chip and a clean answer rather than raw 401 dumps.
+    final_answer = scrub_answer_text(final_answer)
+    errors       = sanitize_errors(errors)
 
     bubble_id = "b-" + uuid.uuid4().hex[:10]
     answer_html  = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)
@@ -500,10 +550,11 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     if conv is None:
         current_id = str(uuid.uuid4())
         conv = {
-            "id":        current_id,
-            "title":     auto_title(query),
-            "timestamp": time.strftime("%Y-%m-%d %H:%M"),
-            "messages":  [],
+            "id":         current_id,
+            "title":      auto_title(query),
+            "timestamp":  time.strftime("%Y-%m-%d %H:%M"),
+            "created_at": int(time.time()),  # Milestone F: drives sidebar relative_time()
+            "messages":   [],
         }
         conversations.insert(0, conv)
         conversations = conversations[:MAX_CONVERSATIONS]
@@ -575,3 +626,132 @@ def download_view(request, filename: str):
     response = HttpResponse(content, content_type=content_types[ext])
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+# ---------------------------------------------------------------------------
+# Conversation management API (Milestone F)
+# ---------------------------------------------------------------------------
+#
+# Three small JSON endpoints power the sidebar history UI. They all use the
+# same request.session["conversations"] list as the rest of the app, so no
+# database migration is required. Each one:
+#   - requires the demo session (auth decorator)
+#   - is POST-only (CSRF enforced by Django middleware)
+#   - returns a JSON status payload, never an HTML page
+#   - is no-op-safe: missing IDs return 404 cleanly
+#
+# Body parsing accepts either form-encoded or application/json so the
+# frontend fetch() call can stay minimal (JSON.stringify with a CSRF header).
+
+def _read_json_body(request) -> dict:
+    """
+    Best-effort body parse: prefer JSON, fall back to form-encoded.
+    Returns an empty dict on parse failure so callers don't have to wrap
+    every access in a try block.
+    """
+    ctype = request.content_type or ""
+    if "application/json" in ctype:
+        try:
+            return json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return {}
+    # Form-encoded fallback
+    return dict(request.POST.items())
+
+
+@demo_login_required
+@require_POST
+def rename_conv_view(request, conv_id: str):
+    """
+    Update a conversation's title. Body: {"title": "<new title>"}.
+    Trims whitespace, rejects empty, caps at 80 chars to keep the sidebar tidy.
+    Returns: 200 {"ok": True, "title": "..."} | 400 invalid | 404 missing.
+    """
+    body  = _read_json_body(request)
+    title = (body.get("title") or "").strip()
+    if not title:
+        return HttpResponse(
+            json.dumps({"ok": False, "error": "Title cannot be empty"}),
+            status=400, content_type="application/json",
+        )
+    if len(title) > 80:
+        title = title[:80].rstrip()
+
+    conversations = request.session.get("conversations", [])
+    for c in conversations:
+        if c.get("id") == conv_id:
+            c["title"] = title
+            request.session["conversations"] = conversations
+            request.session.modified = True
+            return HttpResponse(
+                json.dumps({"ok": True, "title": title}),
+                status=200, content_type="application/json",
+            )
+    return HttpResponse(
+        json.dumps({"ok": False, "error": "Conversation not found"}),
+        status=404, content_type="application/json",
+    )
+
+
+@demo_login_required
+@require_POST
+def delete_conv_view(request, conv_id: str):
+    """
+    Remove a conversation from the sidebar list. If the active conversation
+    was deleted, clear current_conv_id so the next chat view falls back to
+    the empty-state landing page instead of pointing at a dead reference.
+    Returns: 200 {"ok": True} | 404 missing.
+    """
+    conversations = request.session.get("conversations", [])
+    new_list = [c for c in conversations if c.get("id") != conv_id]
+    if len(new_list) == len(conversations):
+        return HttpResponse(
+            json.dumps({"ok": False, "error": "Conversation not found"}),
+            status=404, content_type="application/json",
+        )
+    request.session["conversations"] = new_list
+    if request.session.get("current_conv_id") == conv_id:
+        request.session["current_conv_id"] = None
+    request.session.modified = True
+    return HttpResponse(
+        json.dumps({"ok": True}),
+        status=200, content_type="application/json",
+    )
+
+
+@demo_login_required
+@require_POST
+def reorder_conv_view(request):
+    """
+    Reorder the conversation list. Body: {"order": ["<id1>", "<id2>", ...]}.
+    Items appearing in 'order' are arranged in that sequence; items not
+    listed are appended at the end in their original relative order so a
+    partial payload (e.g. only the visible ones) doesn't lose anything.
+    Returns: 200 {"ok": True, "order": [...]} | 400 invalid body.
+    """
+    body  = _read_json_body(request)
+    order = body.get("order")
+    if not isinstance(order, list) or any(not isinstance(x, str) for x in order):
+        return HttpResponse(
+            json.dumps({"ok": False, "error": "Body must be {order: [str, ...]}"}),
+            status=400, content_type="application/json",
+        )
+
+    conversations = request.session.get("conversations", [])
+    by_id = {c.get("id"): c for c in conversations}
+    seen: set[str] = set()
+    new_list: list[dict] = []
+    for cid in order:
+        if cid in by_id and cid not in seen:
+            new_list.append(by_id[cid])
+            seen.add(cid)
+    # Tail: anything not mentioned, in original order
+    for c in conversations:
+        if c.get("id") not in seen:
+            new_list.append(c)
+
+    request.session["conversations"] = new_list
+    request.session.modified = True
+    return HttpResponse(
+        json.dumps({"ok": True, "order": [c.get("id") for c in new_list]}),
+        status=200, content_type="application/json",
+    )

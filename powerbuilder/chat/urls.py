@@ -24,4 +24,10 @@ urlpatterns = [
 
     # File download
     path("download/<str:filename>/", views.download_view, name="download"),
+
+    # Conversation management API (Milestone F).
+    # All POST-only, JSON-bodied, return JSON. CSRF token required.
+    path("api/conv/reorder/",          views.reorder_conv_view, name="conv_reorder"),
+    path("api/conv/<str:conv_id>/rename/", views.rename_conv_view,  name="conv_rename"),
+    path("api/conv/<str:conv_id>/delete/", views.delete_conv_view,  name="conv_delete"),
 ]

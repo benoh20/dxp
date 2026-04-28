@@ -36,16 +36,44 @@ Context variables:
       {{ answer_html|safe }}
     </div>
 
-    <!-- Non-fatal pipeline warnings (shown subtly under answer) -->
+    {# Non-fatal pipeline warnings, rendered as friendly chips (Milestone E). #}
+    {# The view already converts raw agent errors to user-readable messages   #}
+    {# via sanitize_errors(), so we just lay them out cleanly here.           #}
     {% if errors %}
-    <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border);">
+    <div class="err-chip-row" role="status" aria-label="Pipeline notices">
       {% for err in errors %}
-      <p style="color:var(--text-muted); font-size:0.72rem; margin:0 0 0.2rem; font-style:italic;">
-        ⚠ {{ err }}
-      </p>
+      <div class="err-chip">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>{{ err }}</span>
+      </div>
       {% endfor %}
     </div>
     {% endif %}
+
+    {# Bubble action row (Milestone E): copy + regenerate. Hidden until the   #}
+    {# bubble is hovered (or always visible on touch). The single delegated   #}
+    {# click listener on #messages dispatches data-action.                    #}
+    <div class="bubble-actions" aria-label="Message actions">
+      <button type="button" class="bubble-action-btn" data-action="copy-answer" title="Copy response" aria-label="Copy response">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M3 11V3a.5.5 0 0 1 .5-.5h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="bubble-action-label">Copy</span>
+      </button>
+      <button type="button" class="bubble-action-btn" data-action="regenerate" title="Regenerate response" aria-label="Regenerate response">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8a5 5 0 0 1 8.5-3.5L13 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13 3v3h-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13 8a5 5 0 0 1-8.5 3.5L3 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 13v-3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="bubble-action-label">Regenerate</span>
+      </button>
+    </div>
 
     {# ── Source cards ─────────────────────────────────────────────────────── #}
     {# One small card per researcher memo. Click to expand the preview. #}
@@ -59,7 +87,8 @@ Context variables:
             <path d="M10 2.5V5.5h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
           <span class="source-card-title">{{ s.source }}</span>
-          {% if s.date %}<span class="source-card-date">{{ s.date }}</span>{% endif %}
+          {% if s.count and s.count > 1 %}<span class="source-card-count" title="Memos rolled up">×{{ s.count }}</span>{% endif %}
+          {% if s.date_range %}<span class="source-card-date">{{ s.date_range }}</span>{% elif s.date %}<span class="source-card-date">{{ s.date }}</span>{% endif %}
         </summary>
         {% if s.preview %}
         <p class="source-card-preview">{{ s.preview }}</p>

@@ -67,6 +67,85 @@
     margin-top: 1px;
   }
 
+  /* ── Sidebar conversation rows (Milestone F) ────────────────── */
+  /* The row is a flex container holding the link (title + time) and a
+     hover-revealed delete button. The link itself stretches to fill
+     available width so clicking anywhere on the title navigates. */
+  .sidebar-conv-row {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s;
+    margin-bottom: 1px;
+  }
+  .sidebar-conv-row:hover {
+    background: rgba(255,255,255,0.04);
+  }
+  .sidebar-conv-row.active {
+    background: var(--accent-glow);
+    border-color: rgba(59,130,246,0.3);
+  }
+  /* Drag-to-reorder visual cues */
+  .sidebar-conv-row.dragging {
+    opacity: 0.4;
+  }
+  .sidebar-conv-row.drag-over {
+    border-top: 2px solid var(--accent, #3b82f6);
+  }
+  .sidebar-conv-link {
+    flex: 1;
+    min-width: 0;             /* allows ellipsis inside flex child */
+    padding: 0.55rem 0.5rem 0.55rem 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    text-decoration: none;
+    overflow: hidden;
+  }
+  .sidebar-conv-row:hover .sidebar-conv-link,
+  .sidebar-conv-row.active .sidebar-conv-link {
+    color: var(--text-primary);
+  }
+  .sidebar-conv-title {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-conv-title[contenteditable="true"] {
+    background: rgba(59,130,246,0.12);
+    outline: 1px solid rgba(59,130,246,0.5);
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+    cursor: text;
+  }
+  /* Delete button: hidden until row hover, keyboard-focusable always */
+  .sidebar-conv-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 5px;
+    margin: 4px 4px 4px 0;
+    opacity: 0;
+    transition: opacity 0.12s, background 0.12s, color 0.12s;
+  }
+  .sidebar-conv-row:hover .sidebar-conv-delete,
+  .sidebar-conv-delete:focus-visible {
+    opacity: 1;
+  }
+  .sidebar-conv-delete:hover {
+    background: rgba(239,68,68,0.15);
+    color: #ef4444;
+  }
+
   /* ── Main area ──────────────────────────────────────────────── */
   .chat-main {
     flex: 1;
@@ -189,6 +268,18 @@
   }
   .source-card-summary::-webkit-details-marker { display: none; }
   .source-card-title { color: var(--text-primary); font-weight: 600; }
+  /* Milestone F: a small count badge appears when multiple memos rolled up
+     onto a single source card (avoids the audit's '×9 identical cards' look). */
+  .source-card-count {
+    color: var(--text-secondary);
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
   .source-card-date  { color: var(--text-muted); font-size: 0.68rem; }
   .source-card-preview {
     color: var(--text-secondary);
@@ -352,6 +443,69 @@
     background: rgba(59,130,246,0.08);
   }
   .bubble-edit-btn svg { flex-shrink: 0; }
+
+  /* Bubble action row (Milestone E): copy + regenerate. Sits at the bottom  */
+  /* of every assistant bubble, hidden by default and fades in on bubble    */
+  /* hover. On touch devices it stays at low opacity so it's still tappable. */
+  .bubble-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .bubble-asst:hover .bubble-actions,
+  .bubble-actions:focus-within { opacity: 1; }
+  .bubble-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .bubble-action-btn:hover,
+  .bubble-action-btn:focus-visible {
+    color: var(--text-primary);
+    border-color: rgba(59,130,246,0.4);
+    background: rgba(59,130,246,0.08);
+    outline: none;
+  }
+  .bubble-action-btn svg { flex-shrink: 0; }
+  /* "Copied" / "Regenerating..." transient state */
+  .bubble-action-btn.is-success {
+    color: #10b981;
+    border-color: rgba(16,185,129,0.4);
+    background: rgba(16,185,129,0.08);
+  }
+
+  /* Friendly error chips (Milestone E). Shown under the answer when an     */
+  /* agent reported a non-fatal issue. The view layer converts raw          */
+  /* exception strings to user-readable messages before they reach this.    */
+  .err-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+  .err-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.25);
+    color: #f59e0b;
+    border-radius: 8px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+  .err-chip svg { flex-shrink: 0; }
 
   /* Rerun-mode chip lives above the input bar so the operator knows the */
   /* next submit will replace, not append.                               */
@@ -886,6 +1040,8 @@
     }
     /* Edit button stays visible on touch devices since hover is not a thing */
     .bubble-edit-btn { opacity: 0.85; }
+    /* Bubble actions are always visible on touch since hover does not exist. */
+    .bubble-actions { opacity: 0.85; }
   }
 </style>
 {% endblock %}
@@ -915,15 +1071,29 @@
       </a>
     </div>
 
-    <!-- Conversation history -->
-    <div style="flex:1; overflow-y:auto; padding:0.25rem 0.5rem;">
+    <!-- Conversation history (Milestone F: draggable rows, inline rename, delete) -->
+    <div id="sidebar-conv-list" style="flex:1; overflow-y:auto; padding:0.25rem 0.5rem;">
       {% if conversations %}
         {% for conv in conversations %}
-        <a href="/chat/?conv={{ conv.id }}"
-           class="sidebar-conv {% if conv.id == current_conv_id %}active{% endif %}">
-          {{ conv.title|truncatechars:42 }}
-          <span class="sidebar-conv-time">{{ conv.timestamp }}</span>
-        </a>
+        <div class="sidebar-conv-row {% if conv.id == current_conv_id %}active{% endif %}"
+             draggable="true"
+             data-conv-id="{{ conv.id }}"
+             data-conv-title="{{ conv.title }}">
+          <a class="sidebar-conv-link" href="/chat/?conv={{ conv.id }}">
+            <span class="sidebar-conv-title" data-action="rename-conv" title="Click to rename">{{ conv.title|truncatechars:42 }}</span>
+            <span class="sidebar-conv-time">{{ conv.time_label|default:conv.timestamp }}</span>
+          </a>
+          <button type="button"
+                  class="sidebar-conv-delete"
+                  data-action="delete-conv"
+                  aria-label="Delete conversation"
+                  title="Delete conversation">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 5h10M6 5V3.5A1 1 0 0 1 7 2.5h2a1 1 0 0 1 1 1V5M5 5l.5 8.5a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1L11 5"
+                    stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
         {% endfor %}
       {% else %}
         <p style="color:var(--text-muted); font-size:0.75rem; padding:0.5rem 0.75rem; margin:0;">
@@ -969,6 +1139,39 @@
                   {% else %}
                     {{ msg.content }}
                   {% endif %}
+                </div>
+
+                {% if msg.errors %}
+                <div class="err-chip-row" role="status" aria-label="Pipeline notices">
+                  {% for err in msg.errors %}
+                  <div class="err-chip">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>
+                      <path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <span>{{ err }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="bubble-actions" aria-label="Message actions">
+                  <button type="button" class="bubble-action-btn" data-action="copy-answer" title="Copy response" aria-label="Copy response">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+                      <path d="M3 11V3a.5.5 0 0 1 .5-.5h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                    <span class="bubble-action-label">Copy</span>
+                  </button>
+                  <button type="button" class="bubble-action-btn" data-action="regenerate" title="Regenerate response" aria-label="Regenerate response">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 8a5 5 0 0 1 8.5-3.5L13 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M13 3v3h-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M13 8a5 5 0 0 1-8.5 3.5L3 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M3 13v-3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="bubble-action-label">Regenerate</span>
+                  </button>
                 </div>
 
                 {% if msg.active_agents %}
@@ -1237,6 +1440,21 @@
     if (el) el.scrollTop = el.scrollHeight;
   }
 
+  /* Milestone F: scroll a just-submitted user row to the top of the chat
+     scroll area so the prompt stays visible while the assistant streams in
+     below it. The audit caught that scrollToBottom() pushed the prompt off
+     the top of the viewport on long answers. */
+  function anchorUserPrompt(row) {
+    const scroller = document.getElementById('chat-scroll');
+    if (!scroller || !row) return;
+    /* offsetTop is relative to the scroller because #chat-scroll is the
+       nearest positioned ancestor of #messages. A small top pad keeps the
+       prompt off the very edge so it doesn't kiss the header underline. */
+    const TOP_PAD = 12;
+    const target = Math.max(0, row.offsetTop - TOP_PAD);
+    scroller.scrollTo({ top: target, behavior: 'smooth' });
+  }
+
   function escapeHtml(text) {
     const d = document.createElement('div');
     d.appendChild(document.createTextNode(text));
@@ -1395,13 +1613,16 @@
     textarea.value = '';
     textarea.style.height = 'auto';
     setRerunMode(false);
-    scrollToBottom();
+    /* Milestone F: anchor the just-appended prompt to the TOP of the chat
+       area so the user can read what they submitted while the response
+       streams in below it. */
+    anchorUserPrompt(row);
 
     if (hasFile) {
       // File-upload fallback: HTMX POST to /send/.
       document.getElementById('typing-indicator').style.display = 'block';
       htmx.trigger('#chat-form', 'send-via-htmx');
-      scrollToBottom();
+      anchorUserPrompt(row);
       return;
     }
 
@@ -1414,7 +1635,10 @@
       _activeStream = null;
     }
     showTrace();
-    scrollToBottom();
+    /* Don't scrollToBottom() here — the prior anchorUserPrompt() call put the
+       user row at the top of the viewport, and the trace strip lives at the
+       bottom of the bubble pane already. Auto-scrolling here would yank the
+       prompt off the top, undoing the anchor. */
 
     const url = '/stream/?query=' + encodeURIComponent(query);
     const es = new EventSource(url);
@@ -1482,10 +1706,23 @@
       _activeStream = null;
     }
     hideTrace();
+    /* Milestone E: render an err-chip row inside an asst bubble so the
+       failure styling matches the partial / session-history rendering. */
     const messages = document.getElementById('messages');
     const errRow = document.createElement('div');
     errRow.className = 'msg-row asst';
-    errRow.innerHTML = '<div class="bubble-error">⚠ ' + escapeHtml(label) + '</div>';
+    errRow.innerHTML =
+      '<div class="bubble-asst">'
+      +   '<div class="err-chip-row" role="status" aria-label="Pipeline notices">'
+      +     '<div class="err-chip">'
+      +       '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">'
+      +         '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>'
+      +         '<path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+      +       '</svg>'
+      +       '<span>' + escapeHtml(label) + '</span>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>';
     messages.appendChild(errRow);
     _pendingQuery = '';
     scrollToBottom();
@@ -1571,6 +1808,81 @@
       setRerunMode(true, userRow);
       return;
     }
+
+    /* Milestone E: copy the assistant's prose to the clipboard, swap label  */
+    /* to "Copied" briefly. We pull innerText from .prose-dark so the user   */
+    /* gets clean text without markdown/HTML noise. Falls back to the legacy */
+    /* execCommand path on older browsers without navigator.clipboard.       */
+    if (action === 'copy-answer') {
+      const bubble = trigger.closest('.bubble-asst');
+      if (!bubble) return;
+      const proseEl = bubble.querySelector('.prose-dark');
+      const text = (proseEl ? proseEl.innerText : '').trim();
+      if (!text) return;
+      const label = trigger.querySelector('.bubble-action-label');
+      const flash = function (msg) {
+        if (!label) return;
+        const prev = label.textContent;
+        label.textContent = msg;
+        trigger.classList.add('is-success');
+        setTimeout(function () {
+          label.textContent = prev;
+          trigger.classList.remove('is-success');
+        }, 1400);
+      };
+      const copyFallback = function () {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          flash('Copied');
+        } catch (err) {
+          flash('Copy failed');
+        }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash('Copied'); },
+          function () { copyFallback(); }
+        );
+      } else {
+        copyFallback();
+      }
+      return;
+    }
+
+    /* Milestone E: regenerate without editing. Walks back to the prior      */
+    /* user bubble (immediately preceding .msg-row.user before this asst     */
+    /* row), arms rerun mode anchored on it, drops its query into the input, */
+    /* and submits — splice-on-submit (already handled by the existing rerun */
+    /* logic) cleans up the old asst response in place. If we can't find a   */
+    /* prior user bubble, no-op gracefully.                                  */
+    if (action === 'regenerate') {
+      const asstRow = trigger.closest('.msg-row.asst');
+      if (!asstRow) return;
+      let prev = asstRow.previousElementSibling;
+      while (prev && !prev.classList.contains('msg-row')) {
+        prev = prev.previousElementSibling;
+      }
+      if (!prev || !prev.classList.contains('user')) return;
+      const editBtn = prev.querySelector('.bubble-edit-btn');
+      const query = (editBtn && editBtn.dataset.query) || (prev.dataset.query || '');
+      if (!query) return;
+      textarea.value = query;
+      autoResize();
+      setRerunMode(true, prev);
+      // Submit immediately — that's the whole point of regenerate vs edit.
+      document.getElementById('chat-form').requestSubmit(
+        document.getElementById('send-btn')
+      );
+      return;
+    }
   });
 
   // Cancel button on the rerun chip clears the mode without sending.
@@ -1597,6 +1909,162 @@
       textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   });
+
+  /* ── Sidebar conversation history (Milestone F) ──────────────── */
+  // Inline rename, delete-with-confirm, and HTML5 drag-to-reorder. All
+  // three live on a delegated handler attached to #sidebar-conv-list so
+  // newly inserted rows (after a rename round-trip etc.) keep working.
+  // The CSRF token is read from the cookie Django set on the chat page.
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+  function csrfHeaders() {
+    return { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') };
+  }
+  const sidebarList = document.getElementById('sidebar-conv-list');
+  if (sidebarList) {
+
+    /* Inline rename — click the title to open an editable span. Enter
+       commits, Escape cancels. We avoid <input> swap so the row layout
+       doesn't shift while the user types. */
+    function startRename(titleEl) {
+      if (!titleEl || titleEl.dataset.editing === '1') return;
+      const row = titleEl.closest('.sidebar-conv-row');
+      if (!row) return;
+      const original = row.dataset.convTitle || titleEl.textContent.trim();
+      titleEl.dataset.editing = '1';
+      titleEl.dataset.original = original;
+      titleEl.setAttribute('contenteditable', 'true');
+      titleEl.textContent = original;
+      // Place caret at end
+      const r = document.createRange();
+      r.selectNodeContents(titleEl);
+      r.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      titleEl.focus();
+    }
+    function commitRename(titleEl) {
+      if (!titleEl || titleEl.dataset.editing !== '1') return;
+      const row = titleEl.closest('.sidebar-conv-row');
+      const id  = row && row.dataset.convId;
+      const next = (titleEl.textContent || '').trim();
+      const original = titleEl.dataset.original || '';
+      titleEl.removeAttribute('contenteditable');
+      delete titleEl.dataset.editing;
+      delete titleEl.dataset.original;
+      if (!next) { titleEl.textContent = original; return; }
+      if (next === original) { titleEl.textContent = next; return; }
+      titleEl.textContent = next;
+      if (row) row.dataset.convTitle = next;
+      fetch('/api/conv/' + encodeURIComponent(id) + '/rename/', {
+        method: 'POST',
+        headers: csrfHeaders(),
+        body: JSON.stringify({ title: next }),
+      }).catch(function () { /* network error: keep optimistic state */ });
+    }
+    function cancelRename(titleEl) {
+      if (!titleEl || titleEl.dataset.editing !== '1') return;
+      titleEl.textContent = titleEl.dataset.original || titleEl.textContent;
+      titleEl.removeAttribute('contenteditable');
+      delete titleEl.dataset.editing;
+      delete titleEl.dataset.original;
+      titleEl.blur();
+    }
+
+    sidebarList.addEventListener('click', function (e) {
+      const titleEl = e.target.closest('[data-action="rename-conv"]');
+      if (titleEl) {
+        e.preventDefault();   // suppress link navigation while editing
+        startRename(titleEl);
+        return;
+      }
+      const delBtn = e.target.closest('[data-action="delete-conv"]');
+      if (delBtn) {
+        e.preventDefault();
+        const row = delBtn.closest('.sidebar-conv-row');
+        const id  = row && row.dataset.convId;
+        const title = (row && row.dataset.convTitle) || 'this conversation';
+        if (!id) return;
+        if (!window.confirm('Delete "' + title + '"? This cannot be undone.')) return;
+        const wasActive = row.classList.contains('active');
+        row.remove();
+        fetch('/api/conv/' + encodeURIComponent(id) + '/delete/', {
+          method: 'POST',
+          headers: csrfHeaders(),
+          body: '{}',
+        }).then(function () {
+          if (wasActive) window.location.href = '/chat/?new=1';
+        }).catch(function () { /* keep optimistic remove */ });
+      }
+    });
+
+    sidebarList.addEventListener('keydown', function (e) {
+      const titleEl = e.target.closest('[data-action="rename-conv"][contenteditable="true"]');
+      if (!titleEl) return;
+      if (e.key === 'Enter') { e.preventDefault(); commitRename(titleEl); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelRename(titleEl); }
+    });
+    sidebarList.addEventListener('blur', function (e) {
+      const titleEl = e.target.closest('[data-action="rename-conv"][contenteditable="true"]');
+      if (titleEl) commitRename(titleEl);
+    }, true);
+
+    /* HTML5 drag-and-drop reordering. Native DnD events fire on the
+       draggable element (the row), so we attach handlers via delegation
+       on the list container. Drop into the top half of a row inserts
+       before it, bottom half after. After local reorder we POST the
+       full new ID order, which the backend treats as authoritative. */
+    let dragSrc = null;
+
+    sidebarList.addEventListener('dragstart', function (e) {
+      const row = e.target.closest('.sidebar-conv-row');
+      if (!row) return;
+      dragSrc = row;
+      row.classList.add('dragging');
+      try { e.dataTransfer.setData('text/plain', row.dataset.convId || ''); } catch (_) {}
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    sidebarList.addEventListener('dragend', function () {
+      if (dragSrc) dragSrc.classList.remove('dragging');
+      sidebarList.querySelectorAll('.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+      dragSrc = null;
+    });
+    sidebarList.addEventListener('dragover', function (e) {
+      const row = e.target.closest('.sidebar-conv-row');
+      if (!row || row === dragSrc) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      sidebarList.querySelectorAll('.drag-over').forEach(function (el) {
+        if (el !== row) el.classList.remove('drag-over');
+      });
+      row.classList.add('drag-over');
+    });
+    sidebarList.addEventListener('dragleave', function (e) {
+      const row = e.target.closest('.sidebar-conv-row');
+      if (row) row.classList.remove('drag-over');
+    });
+    sidebarList.addEventListener('drop', function (e) {
+      const target = e.target.closest('.sidebar-conv-row');
+      if (!target || !dragSrc || target === dragSrc) return;
+      e.preventDefault();
+      target.classList.remove('drag-over');
+      const rect = target.getBoundingClientRect();
+      const dropAbove = (e.clientY - rect.top) < (rect.height / 2);
+      target.parentNode.insertBefore(dragSrc, dropAbove ? target : target.nextSibling);
+      // POST new order
+      const order = Array.from(sidebarList.querySelectorAll('.sidebar-conv-row'))
+                         .map(function (r) { return r.dataset.convId; })
+                         .filter(Boolean);
+      fetch('/api/conv/reorder/', {
+        method: 'POST',
+        headers: csrfHeaders(),
+        body: JSON.stringify({ order: order }),
+      }).catch(function () { /* keep optimistic reorder */ });
+    });
+  }
 
   /* ── Scroll to bottom on initial load ─────────────────────────── */
   scrollToBottom();
