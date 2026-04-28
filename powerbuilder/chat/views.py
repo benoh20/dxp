@@ -32,6 +32,7 @@ from functools import wraps
 from . import progress
 from .render_helpers import (
     extract_sources,
+    friendly_error,
     is_plan_run,
     c3_footer_text,
     agent_pill_label,
@@ -39,6 +40,8 @@ from .render_helpers import (
     enrich_downloads,
     plan_outline,
     prefix_heading_ids,
+    sanitize_errors,
+    scrub_answer_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -210,6 +213,12 @@ def send_message_view(request):
     active_agents       = result.get("active_agents", [])
     generated_file_path = result.get("generated_file_path")
     errors              = result.get("errors", [])
+
+    # Milestone E: scrub raw agent-error lines the synthesizer sometimes echoes
+    # into the answer text, and convert the structured errors list into
+    # friendly user-facing messages.
+    final_answer = scrub_answer_text(final_answer)
+    errors       = sanitize_errors(errors)
 
     # Bubble id (Milestone D): used to namespace heading anchors so side-panel
     # nav links jump to the right bubble even when multiple plans share section
@@ -415,7 +424,13 @@ def stream_query_view(request):
             worker_thread.join(timeout=5.0)
 
             if holder["error"]:
-                yield _format_sse({"type": "error", "label": holder["error"]})
+                # Milestone E: map raw exceptions (e.g. AuthenticationError
+                # from the LLM client) to a short, human label before it
+                # reaches the EventSource handler in chat.html.
+                yield _format_sse({
+                    "type": "error",
+                    "label": friendly_error(holder["error"]),
+                })
                 return
 
             result = holder["result"] or {}
@@ -440,6 +455,11 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     active_agents       = result.get("active_agents", [])
     generated_file_path = result.get("generated_file_path")
     errors              = result.get("errors", [])
+
+    # Milestone E: same scrubbing as the HTMX path so SSE clients see the
+    # friendly error chip and a clean answer rather than raw 401 dumps.
+    final_answer = scrub_answer_text(final_answer)
+    errors       = sanitize_errors(errors)
 
     bubble_id = "b-" + uuid.uuid4().hex[:10]
     answer_html  = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)

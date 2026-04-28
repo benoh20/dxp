@@ -353,6 +353,69 @@
   }
   .bubble-edit-btn svg { flex-shrink: 0; }
 
+  /* Bubble action row (Milestone E): copy + regenerate. Sits at the bottom  */
+  /* of every assistant bubble, hidden by default and fades in on bubble    */
+  /* hover. On touch devices it stays at low opacity so it's still tappable. */
+  .bubble-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .bubble-asst:hover .bubble-actions,
+  .bubble-actions:focus-within { opacity: 1; }
+  .bubble-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .bubble-action-btn:hover,
+  .bubble-action-btn:focus-visible {
+    color: var(--text-primary);
+    border-color: rgba(59,130,246,0.4);
+    background: rgba(59,130,246,0.08);
+    outline: none;
+  }
+  .bubble-action-btn svg { flex-shrink: 0; }
+  /* "Copied" / "Regenerating..." transient state */
+  .bubble-action-btn.is-success {
+    color: #10b981;
+    border-color: rgba(16,185,129,0.4);
+    background: rgba(16,185,129,0.08);
+  }
+
+  /* Friendly error chips (Milestone E). Shown under the answer when an     */
+  /* agent reported a non-fatal issue. The view layer converts raw          */
+  /* exception strings to user-readable messages before they reach this.    */
+  .err-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+  .err-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.25);
+    color: #f59e0b;
+    border-radius: 8px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+  .err-chip svg { flex-shrink: 0; }
+
   /* Rerun-mode chip lives above the input bar so the operator knows the */
   /* next submit will replace, not append.                               */
   .rerun-chip {
@@ -886,6 +949,8 @@
     }
     /* Edit button stays visible on touch devices since hover is not a thing */
     .bubble-edit-btn { opacity: 0.85; }
+    /* Bubble actions are always visible on touch since hover does not exist. */
+    .bubble-actions { opacity: 0.85; }
   }
 </style>
 {% endblock %}
@@ -969,6 +1034,39 @@
                   {% else %}
                     {{ msg.content }}
                   {% endif %}
+                </div>
+
+                {% if msg.errors %}
+                <div class="err-chip-row" role="status" aria-label="Pipeline notices">
+                  {% for err in msg.errors %}
+                  <div class="err-chip">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>
+                      <path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <span>{{ err }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="bubble-actions" aria-label="Message actions">
+                  <button type="button" class="bubble-action-btn" data-action="copy-answer" title="Copy response" aria-label="Copy response">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+                      <path d="M3 11V3a.5.5 0 0 1 .5-.5h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                    <span class="bubble-action-label">Copy</span>
+                  </button>
+                  <button type="button" class="bubble-action-btn" data-action="regenerate" title="Regenerate response" aria-label="Regenerate response">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 8a5 5 0 0 1 8.5-3.5L13 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M13 3v3h-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M13 8a5 5 0 0 1-8.5 3.5L3 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M3 13v-3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="bubble-action-label">Regenerate</span>
+                  </button>
                 </div>
 
                 {% if msg.active_agents %}
@@ -1482,10 +1580,23 @@
       _activeStream = null;
     }
     hideTrace();
+    /* Milestone E: render an err-chip row inside an asst bubble so the
+       failure styling matches the partial / session-history rendering. */
     const messages = document.getElementById('messages');
     const errRow = document.createElement('div');
     errRow.className = 'msg-row asst';
-    errRow.innerHTML = '<div class="bubble-error">⚠ ' + escapeHtml(label) + '</div>';
+    errRow.innerHTML =
+      '<div class="bubble-asst">'
+      +   '<div class="err-chip-row" role="status" aria-label="Pipeline notices">'
+      +     '<div class="err-chip">'
+      +       '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">'
+      +         '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/>'
+      +         '<path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+      +       '</svg>'
+      +       '<span>' + escapeHtml(label) + '</span>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>';
     messages.appendChild(errRow);
     _pendingQuery = '';
     scrollToBottom();
@@ -1569,6 +1680,81 @@
       textarea.focus();
       textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setRerunMode(true, userRow);
+      return;
+    }
+
+    /* Milestone E: copy the assistant's prose to the clipboard, swap label  */
+    /* to "Copied" briefly. We pull innerText from .prose-dark so the user   */
+    /* gets clean text without markdown/HTML noise. Falls back to the legacy */
+    /* execCommand path on older browsers without navigator.clipboard.       */
+    if (action === 'copy-answer') {
+      const bubble = trigger.closest('.bubble-asst');
+      if (!bubble) return;
+      const proseEl = bubble.querySelector('.prose-dark');
+      const text = (proseEl ? proseEl.innerText : '').trim();
+      if (!text) return;
+      const label = trigger.querySelector('.bubble-action-label');
+      const flash = function (msg) {
+        if (!label) return;
+        const prev = label.textContent;
+        label.textContent = msg;
+        trigger.classList.add('is-success');
+        setTimeout(function () {
+          label.textContent = prev;
+          trigger.classList.remove('is-success');
+        }, 1400);
+      };
+      const copyFallback = function () {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          flash('Copied');
+        } catch (err) {
+          flash('Copy failed');
+        }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash('Copied'); },
+          function () { copyFallback(); }
+        );
+      } else {
+        copyFallback();
+      }
+      return;
+    }
+
+    /* Milestone E: regenerate without editing. Walks back to the prior      */
+    /* user bubble (immediately preceding .msg-row.user before this asst     */
+    /* row), arms rerun mode anchored on it, drops its query into the input, */
+    /* and submits — splice-on-submit (already handled by the existing rerun */
+    /* logic) cleans up the old asst response in place. If we can't find a   */
+    /* prior user bubble, no-op gracefully.                                  */
+    if (action === 'regenerate') {
+      const asstRow = trigger.closest('.msg-row.asst');
+      if (!asstRow) return;
+      let prev = asstRow.previousElementSibling;
+      while (prev && !prev.classList.contains('msg-row')) {
+        prev = prev.previousElementSibling;
+      }
+      if (!prev || !prev.classList.contains('user')) return;
+      const editBtn = prev.querySelector('.bubble-edit-btn');
+      const query = (editBtn && editBtn.dataset.query) || (prev.dataset.query || '');
+      if (!query) return;
+      textarea.value = query;
+      autoResize();
+      setRerunMode(true, prev);
+      // Submit immediately — that's the whole point of regenerate vs edit.
+      document.getElementById('chat-form').requestSubmit(
+        document.getElementById('send-btn')
+      );
       return;
     }
   });

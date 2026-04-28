@@ -357,3 +357,135 @@ def plan_outline(
         "source_count":   source_count,
         "download_count": download_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# Friendly error rendering (Milestone E)
+# ---------------------------------------------------------------------------
+#
+# Agents return raw exception strings on failure, and the synthesizer LLM
+# sometimes echoes those into the rendered answer. Both surfaces leak ugly
+# stacktraces ("Error code: 401 - {'error': {'message': 'Incorrect API key
+# provided: placeholder. ...'}}") into the UI.
+#
+# friendly_error()    maps a raw error string to a short, human message
+# sanitize_errors()   maps a list of raw errors via friendly_error and dedupes
+# scrub_answer_text() removes ⚠ AgentName: LLM call failed... lines that the
+#                     synthesizer occasionally pastes into final_answer
+#
+# All three are pure functions, defensive on None/empty inputs, and don't
+# import anything from Django or the agent layer so they're easy to test.
+
+# Patterns: (regex_or_substring, friendly_message)
+# Order matters: first match wins, so put more specific patterns first.
+_ERROR_PATTERNS = [
+    # OpenAI: invalid key (placeholder or rotated)
+    (re.compile(r"Incorrect API key provided", re.IGNORECASE),
+     "Couldn't reach the language model: API key isn't configured. Set OPENAI_API_KEY in the environment."),
+    (re.compile(r"invalid_api_key|invalid_request_error.*api[_ ]key", re.IGNORECASE),
+     "Couldn't reach the language model: API key was rejected."),
+    # OpenAI: rate / quota
+    (re.compile(r"rate.?limit|429", re.IGNORECASE),
+     "The language model is rate-limited right now, try again in a moment."),
+    (re.compile(r"insufficient_quota|exceeded.*quota", re.IGNORECASE),
+     "The language model account is out of quota."),
+    # OpenAI: auth other than key
+    (re.compile(r"\b401\b|unauthorized", re.IGNORECASE),
+     "Couldn't reach the language model: authentication failed."),
+    (re.compile(r"\b403\b|forbidden", re.IGNORECASE),
+     "Couldn't reach the language model: permission denied."),
+    # Pinecone
+    (re.compile(r"pinecone", re.IGNORECASE),
+     "Couldn't reach the vector database (Pinecone). Continuing without retrieval."),
+    # Network
+    (re.compile(r"timeout|timed out", re.IGNORECASE),
+     "A request timed out, the response may be incomplete."),
+    (re.compile(r"connection.*refused|connection.*reset|connection.*aborted", re.IGNORECASE),
+     "A network connection failed, the response may be incomplete."),
+    # Generic LLM failure (catch-all if "LLM call failed" but no other pattern matched)
+    (re.compile(r"LLM call failed", re.IGNORECASE),
+     "One of the agents couldn't reach its language model, the response may be incomplete."),
+]
+
+
+def friendly_error(raw: str | None) -> str:
+    """
+    Map a raw agent-error string to a short, user-readable message.
+
+    Examples:
+        "MessagingAgent: LLM call failed - Error code: 401 - {'error': {'message': 'Incorrect API key provided: placeholder. ...'}}"
+        becomes
+        "Couldn't reach the language model: API key isn't configured. Set OPENAI_API_KEY in the environment."
+
+    Defensive: None or empty string returns "" so callers can filter out empties.
+    Unrecognised errors get a generic fallback rather than the raw text.
+    """
+    if not raw:
+        return ""
+    s = str(raw).strip()
+    if not s:
+        return ""
+    for pattern, friendly in _ERROR_PATTERNS:
+        if pattern.search(s):
+            return friendly
+    # Fallback: keep it short and don't leak the raw string. Most users want to
+    # know SOMETHING happened, not the full stacktrace.
+    return "An agent reported an issue, the response may be incomplete."
+
+
+def sanitize_errors(errors: Iterable[str] | None) -> list[str]:
+    """
+    Return a list of friendly error messages, deduplicated, in original order.
+    Empty / None input returns []. Empty individual entries are dropped.
+    """
+    if not errors:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in errors:
+        msg = friendly_error(raw)
+        if not msg or msg in seen:
+            continue
+        seen.add(msg)
+        out.append(msg)
+    return out
+
+
+# A line that starts (after optional whitespace) with the warning glyph followed
+# by an AgentName-style identifier and then "LLM call failed" or similar. The
+# synthesizer occasionally pastes these into the final answer when it sees the
+# error_block in the prompt. We strip them before markdown render.
+_ANSWER_ERROR_LINE_RE = re.compile(
+    r"""
+    ^[ \t]*                              # leading whitespace
+    \u26A0\uFE0F?                        # ⚠ optionally followed by VS16 (⚠️)
+    [ \t]*                               #
+    [A-Z][A-Za-z]*Agent                  # ResearcherAgent, MessagingAgent, ExportAgent, ...
+    [ \t]*[:\-\u2014][ \t]*              # separator: colon, dash, em-dash
+    .*?                                  # anything (e.g. "LLM call", "LLM synthesis", ...)
+    failed                               # the failure word
+    .*$                                  # to end of line
+    """,
+    re.MULTILINE | re.VERBOSE | re.IGNORECASE,
+)
+
+
+def scrub_answer_text(text: str | None) -> str:
+    """
+    Remove agent-error lines that the synthesizer occasionally echoes into
+    the rendered answer. Returns the cleaned text. None / empty returns "".
+
+    Only strips lines that match the warning + AgentName + "LLM call failed"
+    pattern, so plain prose with the word "failed" is left alone.
+
+    The friendly versions of these errors are shown separately under the
+    answer via sanitize_errors(), so the user still knows something went
+    wrong, they just don't see the raw 401 JSON dump.
+    """
+    if not text:
+        return ""
+    # Strip the offending lines plus any blank line they leave behind
+    cleaned = _ANSWER_ERROR_LINE_RE.sub("", text)
+    # Collapse 3+ consecutive newlines that the removal may have created
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.lstrip()
