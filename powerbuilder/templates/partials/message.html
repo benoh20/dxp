@@ -87,7 +87,8 @@ Context variables:
             <path d="M10 2.5V5.5h3" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
           <span class="source-card-title">{{ s.source }}</span>
-          {% if s.date %}<span class="source-card-date">{{ s.date }}</span>{% endif %}
+          {% if s.count and s.count > 1 %}<span class="source-card-count" title="Memos rolled up">×{{ s.count }}</span>{% endif %}
+          {% if s.date_range %}<span class="source-card-date">{{ s.date_range }}</span>{% elif s.date %}<span class="source-card-date">{{ s.date }}</span>{% endif %}
         </summary>
         {% if s.preview %}
         <p class="source-card-preview">{{ s.preview }}</p>

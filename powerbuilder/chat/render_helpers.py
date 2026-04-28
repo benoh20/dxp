@@ -17,6 +17,7 @@ plan_outline()     builds a sectioned outline of a plan response (markdown
 from __future__ import annotations
 
 import re
+import time as _time
 from typing import Iterable
 
 
@@ -35,19 +36,31 @@ _PREVIEW_CHARS = 320
 
 def extract_sources(research_results: Iterable[str] | None) -> list[dict]:
     """
-    Return one card per unique research memo, in original order, deduped on
-    (source, date). Each card has: source, date, preview.
+    Return one card per unique source, in first-seen order.
 
-    Defensive: an empty or None input returns []. Memos that don't match the
-    expected header format are skipped rather than raised, the researcher
-    occasionally returns a fallback string and we don't want one bad row to
-    break the UI.
+    The corpus is chunked, so the same source string typically shows up many
+    times with different DATE stamps (one per chunk file). Showing nine
+    'Powerbuilder curated corpus...' cards in a row was the audit finding
+    behind this milestone, so we collapse on source identity (case-insensitive)
+    and roll the dates up onto a single card.
+
+    Each card has:
+        source   normalised (whitespace-collapsed) source string
+        date     the most recent date if multiple were seen, else the only date
+        date_range  human-readable span when more than one date rolled up
+                    (e.g. '2024-11-12 → 2025-09-15'); empty string otherwise
+        count    how many memos rolled up into this card (>= 1)
+        preview  body preview from the FIRST memo seen for this source
+
+    Defensive: empty or None input returns []. Memos missing the standard
+    header are skipped rather than raised; the researcher occasionally returns
+    a fallback string and we don't want one bad row to break the UI.
     """
     if not research_results:
         return []
 
-    cards: list[dict] = []
-    seen: set[tuple[str, str]] = set()
+    by_source: dict[str, dict] = {}
+    order: list[str] = []
 
     for memo in research_results:
         if not isinstance(memo, str):
@@ -55,26 +68,67 @@ def extract_sources(research_results: Iterable[str] | None) -> list[dict]:
         m = _MEMO_HEADER_RE.search(memo)
         if not m:
             continue
-        source = m.group(1).strip()
+        source = _normalise_ws(m.group(1).strip())
         date = m.group(2).strip()
-        key = (source.lower(), date.lower())
-        if key in seen:
-            continue
-        seen.add(key)
+        key = source.lower()
 
-        # Body is everything after the header line. Strip leading blank lines.
         body = memo[m.end():].lstrip()
         preview = body[:_PREVIEW_CHARS].rstrip()
         if len(body) > _PREVIEW_CHARS:
             preview += "\u2026"
 
-        cards.append({
-            "source":  source,
-            "date":    date,
-            "preview": preview,
-        })
+        if key not in by_source:
+            by_source[key] = {
+                "source":  source,
+                "dates":   [date],
+                "preview": preview,
+            }
+            order.append(key)
+        else:
+            entry = by_source[key]
+            if date not in entry["dates"]:
+                entry["dates"].append(date)
 
+    cards: list[dict] = []
+    for key in order:
+        entry  = by_source[key]
+        dates  = entry["dates"]
+        sorted_dates = _sorted_dates(dates)
+        primary = sorted_dates[-1] if sorted_dates else (dates[0] if dates else "")
+        if len(sorted_dates) > 1:
+            date_range = f"{sorted_dates[0]} → {sorted_dates[-1]}"
+        else:
+            date_range = ""
+        cards.append({
+            "source":     entry["source"],
+            "date":       primary,
+            "date_range": date_range,
+            "count":      len(dates),
+            "preview":    entry["preview"],
+        })
     return cards
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalise_ws(s: str) -> str:
+    """Collapse runs of whitespace so 'foo  bar' and 'foo bar' merge."""
+    return _WS_RE.sub(" ", s).strip()
+
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _sorted_dates(dates: list[str]) -> list[str]:
+    """
+    Return the dates sorted ascending where possible. Pure-ISO strings sort
+    lexicographically (which matches chronological order); free-form strings
+    fall to the end in original order so we don't crash on 'date unknown'.
+    """
+    iso  = sorted(d for d in dates if _ISO_DATE_RE.match(d))
+    rest = [d for d in dates if not _ISO_DATE_RE.match(d)]
+    return iso + rest
 
 
 # Active agents that, when present, indicate a full plan run rather than a
@@ -357,6 +411,69 @@ def plan_outline(
         "source_count":   source_count,
         "download_count": download_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# Relative time formatting (Milestone F: sidebar timestamps)
+# ---------------------------------------------------------------------------
+#
+# The sidebar shows a small timestamp under each conversation title. The old
+# fixed string ('2026-04-28 09:00') ages poorly: a conversation from this
+# morning and one from last week look the same. relative_time() collapses
+# anything within the last week into a short phrase ('Just now', '5m ago',
+# '2h ago', 'Yesterday') and falls back to a 'Mon DD' calendar tag for older
+# entries. Pure (takes a Unix int, returns a string), no Django dependency.
+
+_MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def relative_time(ts: int | float | None, now: int | float | None = None) -> str:
+    """
+    Convert a Unix timestamp into a short human label suitable for the sidebar.
+
+    Buckets:
+        < 60s        becomes  'Just now'
+        < 60m        becomes  'Nm ago'
+        < 24h        becomes  'Nh ago'
+        same calendar day before that  becomes  'Yesterday'
+        < 7 days     becomes  'Nd ago'
+        else         becomes  'Mon DD' (e.g. 'Apr 28')
+
+    Defensive: None or non-numeric input returns ''. Future timestamps clamp
+    to 'Just now' so a small clock skew between client and server doesn't
+    surface a negative duration.
+
+    The optional 'now' parameter exists so tests can pin the wall clock
+    instead of monkey-patching time.
+    """
+    if ts is None:
+        return ""
+    try:
+        ts = int(ts)
+    except (TypeError, ValueError):
+        return ""
+    now_i = int(now) if now is not None else int(_time.time())
+    delta = now_i - ts
+    if delta < 60:
+        return "Just now"
+    if delta < 3600:
+        return f"{delta // 60}m ago"
+    if delta < 86400:
+        return f"{delta // 3600}h ago"
+    # Day-of-year boundary: 'Yesterday' fires only if the calendar date
+    # actually flipped, not just because 24h elapsed.
+    now_struct = _time.localtime(now_i)
+    ts_struct  = _time.localtime(ts)
+    days_ago = (now_struct.tm_yday - ts_struct.tm_yday) % 366
+    if now_struct.tm_year != ts_struct.tm_year:
+        # Cross-year wrap: fall through to absolute formatting below.
+        days_ago = 9_999
+    if days_ago == 1:
+        return "Yesterday"
+    if delta < 7 * 86400 and days_ago < 7:
+        return f"{days_ago}d ago"
+    return f"{_MONTH_ABBR[ts_struct.tm_mon - 1]} {ts_struct.tm_mday:02d}"
 
 
 # ---------------------------------------------------------------------------
