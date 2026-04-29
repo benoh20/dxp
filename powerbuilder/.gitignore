@@ -13,6 +13,9 @@ db.sqlite3
 
 # Static folder at project root
 /static/
+# Collected static output produced by `manage.py collectstatic`. Render and
+# the droplet generate this on every deploy; never commit.
+/staticfiles/
 
 # macOS
 ._*
