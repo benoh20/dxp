@@ -203,6 +203,9 @@ def send_message_view(request):
     # to False. Manager will normalize again.
     ab_test_raw = (request.POST.get("ab_test") or "").strip().lower()
     ab_test = ab_test_raw in ("1", "true", "yes", "on")
+    # Milestone L: optional plan-mode override from the input-bar toggle.
+    # Manager will normalize unknown values to "auto".
+    plan_mode = request.POST.get("plan_mode")
 
     # ── File upload ──────────────────────────────────────────────────────────
     uploaded_file_path = None
@@ -240,6 +243,7 @@ def send_message_view(request):
             org_namespace    = request.session.get("org_namespace", "general"),
             uploaded_file_path = uploaded_file_path,
             ab_test          = ab_test,
+            plan_mode        = plan_mode,
         )
     except Exception as exc:
         logger.exception("Pipeline error: %s", exc)
@@ -410,6 +414,8 @@ def stream_query_view(request):
     # Milestone K: optional A/B-test toggle from the input bar.
     ab_test_raw = (request.GET.get("ab_test") or "").strip().lower()
     ab_test = ab_test_raw in ("1", "true", "yes", "on")
+    # Milestone L: optional plan-mode override from the input-bar toggle.
+    plan_mode = request.GET.get("plan_mode")
 
     org_namespace = request.session.get("org_namespace", "general")
 
@@ -439,6 +445,7 @@ def stream_query_view(request):
                 run_id             = run_id,
                 uploaded_file_path = uploaded_file_path,
                 ab_test            = ab_test,
+                plan_mode          = plan_mode,
             )
         except Exception as exc:
             logger.exception("Streaming pipeline error: %s", exc)

@@ -24,6 +24,12 @@ class AgentState(TypedDict):
     output_format: Literal["markdown", "csv", "text", "docx", "xlsx"] # define target file type
     demographic_intent: Optional[str]  # set by intent_router via keyword scan; "a+b" for combined demographics
     language_intent: Optional[str]     # set by intent_router via keyword scan; ISO 639-1 code (e.g. "es", "en", "zh", "vi", "ko")
+    plan_mode: Optional[Literal["auto", "mobilization", "persuasion"]]
+    # Milestone L: strategic frame the user picked for this plan.
+    #   "mobilization" = turn out existing supporters (cheaper per outcome per Wesleyan 2024 + TFC 2024)
+    #   "persuasion"   = move undecided voters (longer scripts, higher per-outcome cost)
+    #   "auto"         = no override; manager infers from the query (default behavior, equivalent to None)
+    # Cascades into messaging tone, paid-media channel weighting, and CTA shape.
 
     # Milestone K: A/B scaffolding toggle. When True, the messaging agent
     # produces two variants (A and B) per eligible social-leaning format and

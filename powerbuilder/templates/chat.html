@@ -928,6 +928,53 @@
     color: var(--text-muted);
   }
 
+  /* ── Milestone L: plan-mode toggle (mobilization vs persuasion) ──────────
+     Segmented control on the input bar. Defaults to Auto so the existing
+     pipeline behavior is unchanged when the user does not pick a mode. */
+  .mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .mode-toggle__label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-right: 0.15rem;
+  }
+  .mode-toggle__group {
+    display: inline-flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mode-toggle__btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .mode-toggle__btn + .mode-toggle__btn {
+    border-left: 1px solid var(--border);
+  }
+  .mode-toggle__btn:hover { color: var(--text-secondary); }
+  .mode-toggle__btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+  }
+  .mode-toggle__hint {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-left: 0.15rem;
+  }
+
   /* ── Empty state ────────────────────────────────────────────── */
   .empty-state {
     display: flex;
@@ -1536,6 +1583,19 @@
           <input type="hidden" name="ab_test" id="ab-test-input" value="" form="chat-form">
         </div>
 
+        <!-- Milestone L: plan-mode toggle. Hidden input is the source of truth
+             for the form submission; buttons drive aria-pressed + value. -->
+        <div class="mode-toggle" role="group" aria-label="Plan mode">
+          <span class="mode-toggle__label">Mode</span>
+          <div class="mode-toggle__group" id="mode-toggle-group">
+            <button type="button" class="mode-toggle__btn" data-mode="auto" aria-pressed="true" title="Let Powerbuilder pick the natural mix">Auto</button>
+            <button type="button" class="mode-toggle__btn" data-mode="mobilization" aria-pressed="false" title="GOTV: speak to supporters who already agree">Mobilization</button>
+            <button type="button" class="mode-toggle__btn" data-mode="persuasion" aria-pressed="false" title="Move undecided or soft-opposing voters">Persuasion</button>
+          </div>
+          <span class="mode-toggle__hint" id="mode-toggle-hint">Auto picks the mix.</span>
+          <input type="hidden" name="plan_mode" id="plan-mode-input" value="auto" form="chat-form">
+        </div>
+
         {% if not DEMO_MODE %}
         <!-- File badge -->
         <div id="file-badge">
@@ -1753,7 +1813,7 @@
       return;
     }
 
-    startStream(query, getAbTest());
+    startStream(query, getAbTest(), getPlanMode());
   });
 
   /* ── Milestone K: A/B test toggle wiring ──────────────────────────
@@ -1782,7 +1842,41 @@
     });
   })();
 
-  function startStream(query, abTest) {
+  /* ── Milestone L: plan-mode toggle wiring ────────────────────────
+     One hidden input drives both POST (htmx file path) and GET (SSE path).
+     getPlanMode() returns the current value at submit time. */
+  function getPlanMode() {
+    const el = document.getElementById('plan-mode-input');
+    return (el && el.value) ? el.value : 'auto';
+  }
+
+  (function wireModeToggle() {
+    const group  = document.getElementById('mode-toggle-group');
+    const hidden = document.getElementById('plan-mode-input');
+    const hint   = document.getElementById('mode-toggle-hint');
+    if (!group || !hidden) return;
+
+    const HINTS = {
+      auto:         'Auto picks the mix.',
+      mobilization: 'GOTV your supporters.',
+      persuasion:   'Move undecided voters.'
+    };
+
+    group.addEventListener('click', function (e) {
+      const btn = e.target.closest('.mode-toggle__btn');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-mode') || 'auto';
+      // Toggle pressed state
+      const buttons = group.querySelectorAll('.mode-toggle__btn');
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      hidden.value = mode;
+      if (hint) hint.textContent = HINTS[mode] || HINTS.auto;
+    });
+  })();
+
+  function startStream(query, abTest, planMode) {
     if (_activeStream) {
       try { _activeStream.close(); } catch (e) { /* noop */ }
       _activeStream = null;
@@ -1794,10 +1888,14 @@
        prompt off the top, undoing the anchor. */
 
     /* Milestone K: append ab_test to the SSE URL so the streaming pipeline
-       sees the same flag the htmx /send/ path picks up via the hidden input. */
+       sees the same flag the htmx /send/ path picks up via the hidden input.
+       Milestone L: same wiring for plan_mode. */
     let url = '/stream/?query=' + encodeURIComponent(query);
     if (abTest) {
       url += '&ab_test=1';
+    }
+    if (planMode && planMode !== 'auto') {
+      url += '&plan_mode=' + encodeURIComponent(planMode);
     }
     const es = new EventSource(url);
     _activeStream = es;

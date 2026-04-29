@@ -224,6 +224,10 @@ Pull requests welcome. Please:
 - Static files served by `whitenoise` or a CDN
 - A real auth system in front of the demo password gate
 
+### Deploying to powerbuilder.app
+
+See [`DEPLOY.md`](./DEPLOY.md) for the runbook (SSH into the droplet, `git pull origin main`, `sudo systemctl restart powerbuilder`).
+
 ---
 
 ## Research basis and design decisions

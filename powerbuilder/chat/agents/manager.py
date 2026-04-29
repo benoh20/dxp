@@ -150,6 +150,57 @@ def _detect_language_intent(query: str) -> str:
     return "en"
 
 
+# ---------------------------------------------------------------------------
+# Milestone L: Plan mode (mobilization vs persuasion)
+# ---------------------------------------------------------------------------
+# A user-facing toggle on the input bar lets the user pin every messaging
+# output to either mobilization ("GOTV your supporters") or persuasion
+# ("move undecideds"). Default is "auto" — no override, the messaging agent
+# uses its existing natural mix.
+_PLAN_MODES_VALID = ("auto", "mobilization", "persuasion")
+
+# Lightweight keyword fallback for users who type intent in the query rather
+# than clicking the toggle. Order matters: "persuasion" patterns checked first
+# because phrases like "persuade undecided supporters" should not match
+# mobilization on "supporters".
+_PLAN_MODE_KEYWORDS = {
+    "persuasion":   (
+        "persuasion", "persuade", "undecided", "swing voter", "swing voters",
+        "soft opp", "soft opposition", "persuadable",
+    ),
+    "mobilization": (
+        "mobilization", "mobilize", "gotv", "get out the vote", "turnout",
+        "turn out", "base voters", "our supporters", "already with us",
+    ),
+}
+
+
+def _normalize_plan_mode(value) -> str:
+    """Defensive normalization of an explicit plan_mode override from the view."""
+    if not isinstance(value, str):
+        return "auto"
+    v = value.strip().lower()
+    if v not in _PLAN_MODES_VALID:
+        return "auto"
+    return v
+
+
+def _detect_plan_mode(query: str, override: str | None = None) -> str:
+    """
+    Resolve the plan mode for a query. An explicit ``override`` from the UI
+    toggle wins over keyword detection. Falls back to "auto" when neither
+    source yields a valid mode.
+    """
+    normalized = _normalize_plan_mode(override)
+    if normalized != "auto":
+        return normalized
+    q = (query or "").lower()
+    for mode, kws in _PLAN_MODE_KEYWORDS.items():
+        if any(kw in q for kw in kws):
+            return mode
+    return "auto"
+
+
 # Keyword-based fast path for voter file queries — avoids an LLM call for clear cases.
 _VOTER_FILE_KEYWORDS = (
     "voter file", "voterfile", "voter list", "my list", "upload list",
@@ -210,6 +261,12 @@ def intent_router_node(state: AgentState):
     # routing based on this; it simply re-emits the value on every return so
     # downstream nodes see the same flag the view set on initial_state.
     ab_test = bool(state.get("ab_test")) if state.get("ab_test") is not None else False
+    # Milestone L: resolve plan mode once. An explicit override from the UI
+    # toggle (passed via state['plan_mode'] by run_query/run_query_streaming)
+    # always wins over query-keyword detection. Once resolved, the value is
+    # threaded through every return path below so downstream agents (and
+    # particularly the messaging agent) see the same mode.
+    plan_mode = _detect_plan_mode(state["query"], state.get("plan_mode"))
 
     # Fast path: skip LLM for unambiguous voter file queries — only when a file
     # is actually present; keyword match alone must not route to voter_file.
@@ -225,6 +282,7 @@ def intent_router_node(state: AgentState):
             "demographic_intent": "default",
             "language_intent":    language,
             "ab_test":            ab_test,
+            "plan_mode":          plan_mode,
         }
 
     # Fast path: opposition research queries — run election_results first to get
@@ -238,6 +296,7 @@ def intent_router_node(state: AgentState):
                 "demographic_intent": demographic,
                 "language_intent":    language,
                 "ab_test":            ab_test,
+                "plan_mode":          plan_mode,
             }
         if "opposition_research" not in active_agents:
             return {
@@ -246,6 +305,7 @@ def intent_router_node(state: AgentState):
                 "demographic_intent": demographic,
                 "language_intent":    language,
                 "ab_test":            ab_test,
+                "plan_mode":          plan_mode,
             }
 
     # Fast path: voter file sequence (no district) — after voter_file, force
@@ -253,12 +313,12 @@ def intent_router_node(state: AgentState):
     if "voter_file" in active_agents and not _has_district_reference(state["query"]):
         demographic = _detect_demographic_intent(state["query"])
         if "researcher" not in active_agents:
-            return {"router_decision": "researcher",       "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test}
+            return {"router_decision": "researcher",       "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test, "plan_mode": plan_mode}
         if "messaging" not in active_agents:
-            return {"router_decision": "messaging",        "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test}
+            return {"router_decision": "messaging",        "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test, "plan_mode": plan_mode}
         if "cost_calculator" not in active_agents:
-            return {"router_decision": "cost_calculator",  "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test}
-        return     {"router_decision": "finish",           "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test}
+            return {"router_decision": "cost_calculator",  "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test, "plan_mode": plan_mode}
+        return     {"router_decision": "finish",           "output_format": "markdown", "demographic_intent": demographic, "language_intent": language, "ab_test": ab_test, "plan_mode": plan_mode}
 
     llm = get_model()
 
@@ -352,6 +412,7 @@ def intent_router_node(state: AgentState):
         "demographic_intent": _detect_demographic_intent(state["query"]),
         "language_intent":    language,
         "ab_test":            ab_test,
+        "plan_mode":          plan_mode,
     }
 
 # Constructing workflow for user request
@@ -443,6 +504,7 @@ def run_query(
     uploaded_file_path: str | None = None,
     recursion_limit: int = 50,
     ab_test: bool = False,
+    plan_mode: str | None = None,
 ) -> dict:
     """
     Execute the Powerbuilder pipeline for a single user query.
@@ -471,6 +533,10 @@ def run_query(
         # branches the prompt to ask the LLM for two variants on every
         # eligible social-leaning format. False is a safe default.
         "ab_test":       bool(ab_test),
+        # Milestone L: pin the plan mode for this run. Defensive normalization
+        # in case the view passed an unrecognized string (router will also
+        # normalize, but doing it here keeps state clean from the start).
+        "plan_mode":     _normalize_plan_mode(plan_mode),
     }
     if uploaded_file_path:
         initial_state["uploaded_file_path"] = uploaded_file_path
@@ -496,6 +562,7 @@ def run_query_streaming(
     uploaded_file_path: str | None = None,
     recursion_limit: int = 50,
     ab_test: bool = False,
+    plan_mode: str | None = None,
 ) -> dict:
     """
     Streaming variant of ``run_query``. Identical execution path, but the
@@ -514,6 +581,8 @@ def run_query_streaming(
         "run_id":        run_id,
         # Milestone K: same A/B flag handling as run_query.
         "ab_test":       bool(ab_test),
+        # Milestone L: same plan mode handling as run_query.
+        "plan_mode":     _normalize_plan_mode(plan_mode),
     }
     if uploaded_file_path:
         initial_state["uploaded_file_path"] = uploaded_file_path
