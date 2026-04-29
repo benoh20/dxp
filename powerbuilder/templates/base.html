@@ -159,7 +159,7 @@
       background-color: var(--bg-primary);
       color: var(--text-primary);
       font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
@@ -174,6 +174,41 @@
     *:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
+      /* Inner halo: keeps ring visible against same-hue backgrounds. */
+      box-shadow: 0 0 0 4px var(--accent-glow);
+      border-radius: 4px;
+    }
+
+    /* Skip-to-content link (Milestone P) */
+    .skip-to-content {
+      position: absolute;
+      top: -40px;
+      left: 8px;
+      z-index: 1000;
+      padding: 0.55rem 0.9rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: top 120ms ease;
+    }
+    .skip-to-content:focus,
+    .skip-to-content:focus-visible {
+      top: 8px;
+    }
+
+    /* Reduced motion (Milestone P): disables animations + transitions
+       for users who set the OS-level preference. Critical for
+       vestibular-sensitivity users; pulse and slide animations stop. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
     }
   </style>
 
@@ -195,6 +230,9 @@
 </head>
 
 <body style="display:flex; flex-direction:column; min-height:100%;">
+
+  <!-- Skip-to-content (Milestone P) -->
+  <a href="#main-content" class="skip-to-content">Skip to content</a>
 
   <!-- ── Top navigation ──────────────────────────────────────────── -->
   <nav style="
@@ -233,7 +271,7 @@
   </nav>
 
   <!-- ── Main content ────────────────────────────────────────────── -->
-  <main style="flex:1; display:flex; flex-direction:column; min-height:0;">
+  <main id="main-content" style="flex:1; display:flex; flex-direction:column; min-height:0;">
     {% block content %}{% endblock %}
   </main>
 
