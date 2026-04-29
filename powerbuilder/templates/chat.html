@@ -27,7 +27,7 @@
     gap: 0.5rem;
     width: 100%;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border: none;
     border-radius: 8px;
     padding: 0.6rem 0.875rem;
@@ -53,13 +53,13 @@
     border: 1px solid transparent;
   }
   .sidebar-conv:hover {
-    background: rgba(255,255,255,0.04);
+    background: var(--surface-overlay);
     color: var(--text-primary);
   }
   .sidebar-conv.active {
     background: var(--accent-glow);
     color: var(--text-primary);
-    border-color: rgba(59,130,246,0.3);
+    border-color: var(--accent-soft-border);
   }
   .sidebar-conv-time {
     font-size: 0.68rem;
@@ -83,18 +83,18 @@
     margin-bottom: 1px;
   }
   .sidebar-conv-row:hover {
-    background: rgba(255,255,255,0.04);
+    background: var(--surface-overlay);
   }
   .sidebar-conv-row.active {
     background: var(--accent-glow);
-    border-color: rgba(59,130,246,0.3);
+    border-color: var(--accent-soft-border);
   }
   /* Drag-to-reorder visual cues */
   .sidebar-conv-row.dragging {
     opacity: 0.4;
   }
   .sidebar-conv-row.drag-over {
-    border-top: 2px solid var(--accent, #3b82f6);
+    border-top: 2px solid var(--accent);
   }
   .sidebar-conv-link {
     flex: 1;
@@ -116,8 +116,8 @@
     text-overflow: ellipsis;
   }
   .sidebar-conv-title[contenteditable="true"] {
-    background: rgba(59,130,246,0.12);
-    outline: 1px solid rgba(59,130,246,0.5);
+    background: var(--accent-soft-bg-2);
+    outline: 1px solid var(--accent-soft-border);
     border-radius: 3px;
     padding: 1px 4px;
     margin: -1px -4px;
@@ -143,8 +143,51 @@
     opacity: 1;
   }
   .sidebar-conv-delete:hover {
-    background: rgba(239,68,68,0.15);
-    color: #ef4444;
+    background: var(--error-soft-bg-2);
+    color: var(--error);
+  }
+
+  /* Theme switcher (Milestone O) */
+  .theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .theme-switcher__label {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    flex: none;
+  }
+  .theme-switcher__group {
+    display: inline-flex;
+    background: var(--surface-overlay);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+    flex: 1;
+  }
+  .theme-switcher__btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.28rem 0.45rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    line-height: 1.2;
+  }
+  .theme-switcher__btn:hover { color: var(--text-secondary); }
+  .theme-switcher__btn[aria-pressed="true"] {
+    background: var(--accent-soft-bg-2);
+    color: var(--accent);
   }
 
   /* ── Main area ──────────────────────────────────────────────── */
@@ -176,7 +219,7 @@
 
   .bubble-user {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     border-radius: 18px 18px 4px 18px;
     padding: 0.65rem 1rem;
     font-size: 0.85rem;
@@ -194,8 +237,8 @@
     word-break: break-word;
   }
   .bubble-error {
-    background: rgba(239,68,68,0.07);
-    border: 1px solid rgba(239,68,68,0.3);
+    background: var(--error-soft-bg);
+    border: 1px solid var(--error-soft-border);
     border-radius: 10px;
     padding: 0.65rem 0.875rem;
     color: var(--error);
@@ -219,22 +262,22 @@
   .prose-dark a  { color: var(--accent); text-decoration: none; }
   .prose-dark a:hover { text-decoration: underline; }
   .prose-dark code {
-    background: rgba(59,130,246,0.1); color: var(--accent);
+    background: var(--accent-soft-bg); color: var(--accent);
     padding: 1px 5px; border-radius: 4px; font-size: 0.8em;
   }
   .prose-dark pre {
-    background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+    background: var(--surface-overlay-2); border: 1px solid var(--border);
     border-radius: 8px; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.5rem 0;
   }
   .prose-dark pre code { background: none; color: var(--text-secondary); padding: 0; }
   .prose-dark table  { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.82rem; }
   .prose-dark th {
-    background: rgba(59,130,246,0.1); color: var(--text-primary);
+    background: var(--accent-soft-bg); color: var(--text-primary);
     padding: 0.4rem 0.75rem; text-align: left; border: 1px solid var(--border);
     font-weight: 600;
   }
   .prose-dark td { color: var(--text-secondary); padding: 0.35rem 0.75rem; border: 1px solid var(--border); }
-  .prose-dark tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .prose-dark tr:nth-child(even) td { background: var(--surface-overlay-3); }
   .prose-dark hr { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
   .prose-dark blockquote {
     border-left: 3px solid var(--accent); margin: 0.5rem 0;
@@ -249,7 +292,7 @@
     margin-top: 0.75rem;
   }
   .source-card {
-    background: rgba(255,255,255,0.03);
+    background: var(--surface-overlay);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.4rem 0.65rem;
@@ -257,8 +300,8 @@
     max-width: 100%;
     transition: border-color 0.12s, background 0.12s;
   }
-  .source-card:hover { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.05); }
-  .source-card[open] { background: rgba(59,130,246,0.06); border-color: rgba(59,130,246,0.35); }
+  .source-card:hover { border-color: var(--accent-soft-border); background: var(--accent-soft-bg); }
+  .source-card[open] { background: var(--accent-soft-bg); border-color: var(--accent-soft-border); }
   .source-card-summary {
     display: inline-flex;
     align-items: center;
@@ -273,8 +316,8 @@
      onto a single source card (avoids the audit's '×9 identical cards' look). */
   .source-card-count {
     color: var(--text-secondary);
-    background: rgba(59,130,246,0.12);
-    border: 1px solid rgba(59,130,246,0.25);
+    background: var(--accent-soft-bg-2);
+    border: 1px solid var(--accent-soft-border);
     border-radius: 999px;
     padding: 0 0.4rem;
     font-size: 0.62rem;
@@ -310,8 +353,8 @@
   .plan-panel {
     flex: 0 0 224px;
     align-self: flex-start;
-    background: rgba(59,130,246,0.05);
-    border: 1px solid rgba(59,130,246,0.22);
+    background: var(--accent-soft-bg);
+    border: 1px solid var(--accent-soft-border);
     border-radius: 14px;
     padding: 0.7rem 0.8rem 0.85rem;
     font-size: 0.74rem;
@@ -337,7 +380,7 @@
   }
   .plan-panel-toggle {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--surface-overlay-2);
     border-radius: 6px;
     color: var(--text-muted);
     padding: 2px 5px;
@@ -345,7 +388,7 @@
     line-height: 0;
     transition: transform 0.18s ease, color 0.12s, border-color 0.12s;
   }
-  .plan-panel-toggle:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.18); }
+  .plan-panel-toggle:hover { color: var(--text-primary); border-color: var(--border-strong); }
   .plan-panel.is-collapsed { flex-basis: 36px; padding: 0.55rem 0.45rem; }
   .plan-panel.is-collapsed .plan-panel-eyebrow,
   .plan-panel.is-collapsed .plan-panel-nav,
@@ -368,7 +411,7 @@
     transition: background 0.12s, color 0.12s, border-color 0.12s;
   }
   .plan-panel-nav-item a:hover {
-    background: rgba(59,130,246,0.08);
+    background: var(--accent-soft-bg);
     color: var(--text-primary);
     border-left-color: var(--accent);
   }
@@ -400,7 +443,7 @@
     transition: background 0.12s;
   }
   .plan-panel-group-head:hover {
-    background: rgba(59,130,246,0.08);
+    background: var(--accent-soft-bg);
   }
   .plan-panel-group-caret {
     flex-shrink: 0;
@@ -427,7 +470,7 @@
     list-style: none;
     padding: 0.15rem 0 0.15rem 0.95rem;  /* indent under caret */
     margin: 0;
-    border-left: 1px dashed rgba(255,255,255,0.07);
+    border-left: 1px dashed var(--divider-dashed);
     margin-left: 0.7rem;
   }
   .plan-panel-group-list--orphan {
@@ -440,7 +483,7 @@
   }
 
   .plan-panel-meta {
-    border-top: 1px dashed rgba(255,255,255,0.08);
+    border-top: 1px dashed var(--surface-overlay-2);
     padding-top: 0.55rem;
     display: flex;
     flex-direction: column;
@@ -456,8 +499,8 @@
   }
   .plan-panel-meta-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
   .plan-panel-pill {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--surface-overlay);
+    border: 1px solid var(--surface-overlay-2);
     border-radius: 999px;
     padding: 1px 7px;
     font-size: 0.65rem;
@@ -475,7 +518,7 @@
   .prose-dark h1.is-target,
   .prose-dark h2.is-target,
   .prose-dark h3.is-target {
-    background: rgba(59,130,246,0.12);
+    background: var(--accent-soft-bg-2);
     box-shadow: -3px 0 0 var(--accent);
     padding-left: 0.45rem;
     border-radius: 2px;
@@ -492,7 +535,7 @@
     align-items: center;
     gap: 0.3rem;
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--surface-overlay-2);
     color: var(--text-muted);
     border-radius: 999px;
     padding: 3px 9px;
@@ -505,8 +548,8 @@
   .bubble-edit-btn:focus-visible { opacity: 1; }
   .bubble-edit-btn:hover {
     color: var(--text-primary);
-    border-color: rgba(59,130,246,0.4);
-    background: rgba(59,130,246,0.08);
+    border-color: var(--accent-soft-border);
+    background: var(--accent-soft-bg);
   }
   .bubble-edit-btn svg { flex-shrink: 0; }
 
@@ -527,7 +570,7 @@
     align-items: center;
     gap: 0.3rem;
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--surface-overlay-2);
     color: var(--text-muted);
     border-radius: 999px;
     padding: 3px 9px;
@@ -538,16 +581,16 @@
   .bubble-action-btn:hover,
   .bubble-action-btn:focus-visible {
     color: var(--text-primary);
-    border-color: rgba(59,130,246,0.4);
-    background: rgba(59,130,246,0.08);
+    border-color: var(--accent-soft-border);
+    background: var(--accent-soft-bg);
     outline: none;
   }
   .bubble-action-btn svg { flex-shrink: 0; }
   /* "Copied" / "Regenerating..." transient state */
   .bubble-action-btn.is-success {
-    color: #10b981;
-    border-color: rgba(16,185,129,0.4);
-    background: rgba(16,185,129,0.08);
+    color: var(--success);
+    border-color: var(--success-soft-border);
+    background: var(--success-soft-bg);
   }
 
   /* Friendly error chips (Milestone E). Shown under the answer when an     */
@@ -563,9 +606,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: rgba(245,158,11,0.08);
-    border: 1px solid rgba(245,158,11,0.25);
-    color: #f59e0b;
+    background: var(--warning-soft-bg);
+    border: 1px solid var(--warning-soft-border);
+    color: var(--warning);
     border-radius: 8px;
     padding: 4px 9px;
     font-size: 0.72rem;
@@ -579,9 +622,9 @@
     display: none;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(245,158,11,0.1);
-    border: 1px solid rgba(245,158,11,0.35);
-    color: #f59e0b;
+    background: var(--warning-soft-bg);
+    border: 1px solid var(--warning-soft-border);
+    color: var(--warning);
     border-radius: 999px;
     padding: 3px 10px 3px 9px;
     font-size: 0.72rem;
@@ -592,7 +635,7 @@
   .rerun-chip-dot {
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: #f59e0b;
+    background: var(--warning);
   }
   .rerun-chip-clear {
     background: transparent;
@@ -628,7 +671,7 @@
   }
   .trace-spinner {
     width: 12px; height: 12px;
-    border: 2px solid rgba(59,130,246,0.25);
+    border: 2px solid var(--accent-soft-border);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: trace-spin 0.85s linear infinite;
@@ -644,9 +687,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    background: rgba(34,197,94,0.08);
-    color: #4ade80;
-    border: 1px solid rgba(34,197,94,0.25);
+    background: var(--success-soft-bg);
+    color: var(--success);
+    border: 1px solid var(--success-soft-border);
     border-radius: 999px;
     font-size: 0.68rem;
     padding: 2px 8px;
@@ -656,9 +699,9 @@
     font-weight: 700;
   }
   .trace-step.errored {
-    background: rgba(239,68,68,0.07);
-    color: #f87171;
-    border-color: rgba(239,68,68,0.3);
+    background: var(--error-soft-bg);
+    color: var(--error);
+    border-color: var(--error-soft-border);
   }
   .trace-step.errored::before { content: "⚠"; }
 
@@ -672,7 +715,7 @@
     border-top: 1px solid var(--border);
   }
   .agent-pill {
-    background: rgba(59,130,246,0.08);
+    background: var(--accent-soft-bg);
     color: var(--text-muted);
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -835,7 +878,7 @@
     flex-shrink: 0;
     transition: color 0.12s, background 0.12s;
   }
-  .input-icon-btn:hover { color: var(--text-secondary); background: rgba(255,255,255,0.05); }
+  .input-icon-btn:hover { color: var(--text-secondary); background: var(--surface-overlay); }
 
   #message-input {
     flex: 1;
@@ -856,7 +899,7 @@
   .send-btn {
     background: var(--accent);
     border: none;
-    color: #fff;
+    color: var(--on-accent);
     border-radius: 8px;
     padding: 7px;
     cursor: pointer;
@@ -882,6 +925,99 @@
     padding: 0 2px;
   }
   #file-badge button:hover { color: var(--error); }
+
+  /* ── Milestone K: A/B test toggle pill on the input bar ──────────────
+     A single on/off chip. Default off. When on, a sample-size math block is
+     prepended to the social messaging outputs and Variant A/B headers are
+     applied to text, digital copy, Meta, YouTube, and TikTok formats. */
+  .ab-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .ab-toggle__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 4px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    font-family: inherit;
+  }
+  .ab-toggle__chip:hover { color: var(--text-secondary); border-color: var(--text-muted); }
+  .ab-toggle__chip[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .ab-toggle__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--text-muted);
+  }
+  .ab-toggle__chip[aria-pressed="true"] .ab-toggle__dot {
+    background: #fff;
+  }
+  .ab-toggle__hint {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+
+  /* ── Milestone L: plan-mode toggle (mobilization vs persuasion) ──────────
+     Segmented control on the input bar. Defaults to Auto so the existing
+     pipeline behavior is unchanged when the user does not pick a mode. */
+  .mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .mode-toggle__label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-right: 0.15rem;
+  }
+  .mode-toggle__group {
+    display: inline-flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .mode-toggle__btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .mode-toggle__btn + .mode-toggle__btn {
+    border-left: 1px solid var(--border);
+  }
+  .mode-toggle__btn:hover { color: var(--text-secondary); }
+  .mode-toggle__btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+  }
+  .mode-toggle__hint {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-left: 0.15rem;
+  }
 
   /* ── Empty state ────────────────────────────────────────────── */
   .empty-state {
@@ -974,13 +1110,13 @@
     border-radius: 999px;
     border: 1px solid transparent;
   }
-  .demo-tile-chip--plan { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border-color: rgba(59, 130, 246, 0.28); }
-  .demo-tile-chip--win  { background: rgba(34, 197, 94, 0.12); color: #22c55e; border-color: rgba(34, 197, 94, 0.28); }
-  .demo-tile-chip--opp  { background: rgba(239, 68, 68, 0.12); color: #ef4444; border-color: rgba(239, 68, 68, 0.28); }
-  .demo-tile-chip--lang { background: rgba(168, 85, 247, 0.12); color: #a855f7; border-color: rgba(168, 85, 247, 0.28); }
-  .demo-tile-chip--vf   { background: rgba(245, 158, 11, 0.14); color: #d97706; border-color: rgba(245, 158, 11, 0.30); }
+  .demo-tile-chip--plan { background: var(--accent-soft-bg-2); color: var(--accent); border-color: var(--accent-soft-border); }
+  .demo-tile-chip--win  { background: var(--success-soft-bg-2); color: var(--success); border-color: var(--success-soft-border); }
+  .demo-tile-chip--opp  { background: var(--error-soft-bg-2); color: var(--error); border-color: var(--error-soft-border); }
+  .demo-tile-chip--lang { background: var(--accent-soft-bg-2); color: var(--accent); border-color: var(--accent-soft-border); }
+  .demo-tile-chip--vf   { background: var(--warning-soft-bg-2); color: var(--warning-strong); border-color: var(--warning-soft-border); }
   /* Milestone H: social media script pack chip (cyan/teal) */
-  .demo-tile-chip--social { background: rgba(20, 184, 166, 0.14); color: #14b8a6; border-color: rgba(20, 184, 166, 0.30); }
+  .demo-tile-chip--social { background: var(--success-soft-bg-2); color: var(--success); border-color: var(--success-soft-border); }
   .demo-tile-headline {
     font-size: 0.86rem;
     font-weight: 600;
@@ -1014,15 +1150,15 @@
   .vf-chip-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: #22c55e;
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+    background: var(--success);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent);
     animation: vf-chip-pulse 2.4s ease-in-out infinite;
     flex: none;
   }
   .vf-chip-strong { color: var(--text-secondary); font-weight: 600; }
   @keyframes vf-chip-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
-    50%      { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--success) 0%,  transparent); }
   }
 
   /* ── HTMX loading indicator on send btn ─────────────────────── */
@@ -1068,7 +1204,7 @@
       z-index: 20;
       transform: translateX(-100%);
       transition: transform 0.22s ease;
-      box-shadow: 2px 0 18px rgba(0,0,0,0.35);
+      box-shadow: 2px 0 18px var(--surface-overlay-2);
     }
     #sidebar-toggle:checked ~ .chat-root .sidebar { transform: translateX(0); }
     #sidebar-toggle:checked ~ .chat-root .sidebar-scrim { display: block; }
@@ -1132,8 +1268,8 @@
     <!-- New conversation -->
     <div style="padding:0.875rem 0.75rem 0.5rem;">
       <a href="/chat/?new=1" class="sidebar-new-btn">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M8 3v10M3 8h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
         {% trans "New conversation" %}
       </a>
@@ -1168,6 +1304,19 @@
           {% trans "No conversations yet" %}
         </p>
       {% endif %}
+    </div>
+
+    <!-- Theme switcher (Milestone O) -->
+    <div class="theme-switcher" role="group" aria-label="Theme">
+      <span class="theme-switcher__label">Theme</span>
+      <div class="theme-switcher__group" id="theme-switcher-group">
+        <button type="button" class="theme-switcher__btn" data-theme-choice="system"
+                aria-pressed="true" title="Follow your device setting">System</button>
+        <button type="button" class="theme-switcher__btn" data-theme-choice="light"
+                aria-pressed="false" title="Always light">Light</button>
+        <button type="button" class="theme-switcher__btn" data-theme-choice="dark"
+                aria-pressed="false" title="Always dark">Dark</button>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -1480,6 +1629,30 @@
           </div>
         </form>
 
+        <!-- Milestone K: A/B scaffolding toggle. Hidden input is the form's
+             source of truth; the chip drives aria-pressed + value. -->
+        <div class="ab-toggle" aria-label="A/B test toggle">
+          <button type="button" class="ab-toggle__chip" id="ab-toggle-chip" aria-pressed="false" title="Generate two variants of every social messaging output">
+            <span class="ab-toggle__dot" aria-hidden="true"></span>
+            <span>A/B test variants</span>
+          </button>
+          <span class="ab-toggle__hint" id="ab-toggle-hint">Off (single variant per format).</span>
+          <input type="hidden" name="ab_test" id="ab-test-input" value="" form="chat-form">
+        </div>
+
+        <!-- Milestone L: plan-mode toggle. Hidden input is the source of truth
+             for the form submission; buttons drive aria-pressed + value. -->
+        <div class="mode-toggle" role="group" aria-label="Plan mode">
+          <span class="mode-toggle__label">Mode</span>
+          <div class="mode-toggle__group" id="mode-toggle-group">
+            <button type="button" class="mode-toggle__btn" data-mode="auto" aria-pressed="true" title="Let Powerbuilder pick the natural mix">Auto</button>
+            <button type="button" class="mode-toggle__btn" data-mode="mobilization" aria-pressed="false" title="GOTV: speak to supporters who already agree">Mobilization</button>
+            <button type="button" class="mode-toggle__btn" data-mode="persuasion" aria-pressed="false" title="Move undecided or soft-opposing voters">Persuasion</button>
+          </div>
+          <span class="mode-toggle__hint" id="mode-toggle-hint">Auto picks the mix.</span>
+          <input type="hidden" name="plan_mode" id="plan-mode-input" value="auto" form="chat-form">
+        </div>
+
         {% if not DEMO_MODE %}
         <!-- File badge -->
         <div id="file-badge">
@@ -1697,10 +1870,70 @@
       return;
     }
 
-    startStream(query);
+    startStream(query, getAbTest(), getPlanMode());
   });
 
-  function startStream(query) {
+  /* ── Milestone K: A/B test toggle wiring ──────────────────────────
+     Single chip; clicking flips aria-pressed and the hidden input value. */
+  function getAbTest() {
+    const el = document.getElementById('ab-test-input');
+    return !!(el && el.value === '1');
+  }
+
+  (function wireAbToggle() {
+    const chip   = document.getElementById('ab-toggle-chip');
+    const hidden = document.getElementById('ab-test-input');
+    const hint   = document.getElementById('ab-toggle-hint');
+    if (!chip || !hidden) return;
+
+    chip.addEventListener('click', function () {
+      const pressed = chip.getAttribute('aria-pressed') === 'true';
+      const next = !pressed;
+      chip.setAttribute('aria-pressed', next ? 'true' : 'false');
+      hidden.value = next ? '1' : '';
+      if (hint) {
+        hint.textContent = next
+          ? 'On: two variants per social format + sample-size math.'
+          : 'Off (single variant per format).';
+      }
+    });
+  })();
+
+  /* ── Milestone L: plan-mode toggle wiring ────────────────────────
+     One hidden input drives both POST (htmx file path) and GET (SSE path).
+     getPlanMode() returns the current value at submit time. */
+  function getPlanMode() {
+    const el = document.getElementById('plan-mode-input');
+    return (el && el.value) ? el.value : 'auto';
+  }
+
+  (function wireModeToggle() {
+    const group  = document.getElementById('mode-toggle-group');
+    const hidden = document.getElementById('plan-mode-input');
+    const hint   = document.getElementById('mode-toggle-hint');
+    if (!group || !hidden) return;
+
+    const HINTS = {
+      auto:         'Auto picks the mix.',
+      mobilization: 'GOTV your supporters.',
+      persuasion:   'Move undecided voters.'
+    };
+
+    group.addEventListener('click', function (e) {
+      const btn = e.target.closest('.mode-toggle__btn');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-mode') || 'auto';
+      // Toggle pressed state
+      const buttons = group.querySelectorAll('.mode-toggle__btn');
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      hidden.value = mode;
+      if (hint) hint.textContent = HINTS[mode] || HINTS.auto;
+    });
+  })();
+
+  function startStream(query, abTest, planMode) {
     if (_activeStream) {
       try { _activeStream.close(); } catch (e) { /* noop */ }
       _activeStream = null;
@@ -1711,7 +1944,16 @@
        bottom of the bubble pane already. Auto-scrolling here would yank the
        prompt off the top, undoing the anchor. */
 
-    const url = '/stream/?query=' + encodeURIComponent(query);
+    /* Milestone K: append ab_test to the SSE URL so the streaming pipeline
+       sees the same flag the htmx /send/ path picks up via the hidden input.
+       Milestone L: same wiring for plan_mode. */
+    let url = '/stream/?query=' + encodeURIComponent(query);
+    if (abTest) {
+      url += '&ab_test=1';
+    }
+    if (planMode && planMode !== 'auto') {
+      url += '&plan_mode=' + encodeURIComponent(planMode);
+    }
     const es = new EventSource(url);
     _activeStream = es;
     let _gotDone = false;
@@ -2137,7 +2379,52 @@
     });
   }
 
-  /* ── Scroll to bottom on initial load ─────────────────────────── */
+  /* Theme switcher (Milestone O):
+     - 'system' clears localStorage and removes data-theme so the
+       prefers-color-scheme media query takes over.
+     - 'light' / 'dark' write data-theme + persist.
+     The pre-paint bootstrap in base.html reads localStorage on
+     subsequent loads, so the choice survives navigation. */
+  (function wireThemeSwitcher() {
+    var group = document.getElementById('theme-switcher-group');
+    if (!group) return;
+
+    function readSaved() {
+      try { return localStorage.getItem('pb-theme'); } catch (e) { return null; }
+    }
+    function writeSaved(v) {
+      try {
+        if (v === 'system' || v == null) localStorage.removeItem('pb-theme');
+        else localStorage.setItem('pb-theme', v);
+      } catch (e) { /* ignore */ }
+    }
+    function apply(choice) {
+      var root = document.documentElement;
+      if (choice === 'light' || choice === 'dark') {
+        root.setAttribute('data-theme', choice);
+      } else {
+        root.removeAttribute('data-theme');
+      }
+      var btns = group.querySelectorAll('.theme-switcher__btn');
+      btns.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.themeChoice === (choice || 'system')));
+      });
+    }
+
+    /* Hydrate aria-pressed from saved choice (or 'system' default). */
+    var saved = readSaved();
+    apply(saved === 'light' || saved === 'dark' ? saved : 'system');
+
+    group.addEventListener('click', function (e) {
+      var btn = e.target.closest('.theme-switcher__btn');
+      if (!btn) return;
+      var choice = btn.dataset.themeChoice;
+      writeSaved(choice);
+      apply(choice);
+    });
+  })();
+
+  /* Scroll to bottom on initial load */
   scrollToBottom();
 }());
 </script>

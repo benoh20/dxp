@@ -18,22 +18,134 @@
   <script defer src="https://unpkg.com/alpinejs@3.13.10/dist/cdn.min.js"></script>
 
   <style>
-    /* ── Design tokens ─────────────────────────────────────────── */
-    :root {
-      --bg-primary:    #0f1117;
-      --bg-secondary:  #1a1d27;
-      --bg-card:       #1e2130;
-      --accent:        #3b82f6;
-      --accent-hover:  #2563eb;
-      --accent-glow:   rgba(59, 130, 246, 0.15);
-      --text-primary:  #f1f5f9;
-      --text-secondary:#94a3b8;
-      --text-muted:    #475569;
-      --border:        #2d3148;
-      --border-accent: #3b82f6;
-      --success:       #10b981;
-      --warning:       #f59e0b;
-      --error:         #ef4444;
+    /* ── Design tokens (Milestone O: pastel light + dark) ─────────
+       Palette psychology: dusty blue (trust, confidence) primary,
+       sage (growth, safety) success, soft gold (clarity) highlight,
+       muted terracotta (caution without alarm) warning. Every text
+       pair below passes WCAG AA on its surface. */
+
+    /* DARK is the default (matches prior look for existing users) */
+    :root,
+    :root[data-theme="dark"] {
+      --bg-primary:        #14171C;
+      --bg-secondary:      #1A1F26;
+      --bg-card:           #1C2026;
+      --accent:            #8FB3D9;   /* dusty blue */
+      --accent-hover:      #A8C4E0;
+      --accent-strong:     #6B8FB5;
+      --accent-glow:       rgba(143, 179, 217, 0.16);
+      --accent-soft-bg:    rgba(143, 179, 217, 0.10);
+      --accent-soft-bg-2:  rgba(143, 179, 217, 0.14);
+      --accent-soft-border:rgba(143, 179, 217, 0.30);
+      --on-accent:         #0E1218;
+      --text-primary:      #E8EAED;
+      --text-secondary:    #B6BDC8;
+      --text-muted:        #8A93A0;
+      --border:            #2A2F38;
+      --border-strong:     #3A4250;
+      --surface-overlay:   rgba(255,255,255,0.04);
+      --surface-overlay-2: rgba(255,255,255,0.07);
+      --surface-overlay-3: rgba(255,255,255,0.02);
+      --divider-dashed:    rgba(255,255,255,0.08);
+      --success:           #A8D4BB;   /* sage */
+      --success-soft-bg:   rgba(168, 212, 187, 0.10);
+      --success-soft-border:rgba(168, 212, 187, 0.30);
+      --warning:           #E0A77F;   /* muted terracotta */
+      --warning-strong:    #C98A5E;
+      --warning-soft-bg:   rgba(224, 167, 127, 0.10);
+      --warning-soft-bg-2: rgba(224, 167, 127, 0.14);
+      --warning-soft-border:rgba(224, 167, 127, 0.32);
+      --error:             #F0A0A0;
+      --error-soft-bg:     rgba(240, 160, 160, 0.10);
+      --error-soft-bg-2:   rgba(240, 160, 160, 0.14);
+      --error-soft-border: rgba(240, 160, 160, 0.32);
+      --highlight:         #F0D58A;   /* soft gold */
+    }
+
+    /* LIGHT theme: warm off-white background, dusty-blue accent.
+       The text palette is darker and the soft-bg overlays are
+       inverted to subtle tints on white instead of whites on dark. */
+    :root[data-theme="light"] {
+      --bg-primary:        #F7F5EF;   /* warm off-white */
+      --bg-secondary:      #EFEBE2;
+      --bg-card:           #FFFFFF;
+      --accent:            #3D6A99;   /* dusty blue, AA on both surfaces */
+      --accent-hover:      #2F557C;
+      --accent-strong:     #2F557C;
+      --accent-glow:       rgba(61, 106, 153, 0.10);
+      --accent-soft-bg:    rgba(61, 106, 153, 0.06);
+      --accent-soft-bg-2:  rgba(61, 106, 153, 0.10);
+      --accent-soft-border:rgba(61, 106, 153, 0.28);
+      --on-accent:         #FFFFFF;
+      --text-primary:      #1F2937;
+      --text-secondary:    #3F4856;
+      --text-muted:        #5B6470;
+      --border:            #DCD6C7;
+      --border-strong:     #BFB6A1;
+      --surface-overlay:   rgba(31, 41, 55, 0.04);
+      --surface-overlay-2: rgba(31, 41, 55, 0.07);
+      --surface-overlay-3: rgba(31, 41, 55, 0.02);
+      --divider-dashed:    rgba(31, 41, 55, 0.10);
+      --success:           #3F7A5C;   /* sage, AA on light bg */
+      --success-soft-bg:   rgba(63, 122, 92, 0.08);
+      --success-soft-border:rgba(63, 122, 92, 0.30);
+      --warning:           #A35E3A;
+      --warning-strong:    #8A4D2E;
+      --warning-soft-bg:   rgba(163, 94, 58, 0.08);
+      --warning-soft-bg-2: rgba(163, 94, 58, 0.12);
+      --warning-soft-border:rgba(163, 94, 58, 0.30);
+      --error:             #B14A4A;
+      --error-soft-bg:     rgba(177, 74, 74, 0.07);
+      --error-soft-bg-2:   rgba(177, 74, 74, 0.10);
+      --error-soft-border: rgba(177, 74, 74, 0.32);
+      --highlight:         #C9A24A;
+    }
+
+    /* Auto-follow system when no manual choice has been made.
+       The theme-toggle script sets data-theme="light|dark" on <html>
+       and persists to localStorage; the absence of that attribute
+       (or data-theme="system") means we honor prefers-color-scheme. */
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) {
+        --bg-primary:        #F7F5EF;
+        --bg-secondary:      #EFEBE2;
+        --bg-card:           #FFFFFF;
+        --accent:            #3D6A99;
+        --accent-hover:      #2F557C;
+        --accent-strong:     #2F557C;
+        --accent-glow:       rgba(61, 106, 153, 0.10);
+        --accent-soft-bg:    rgba(61, 106, 153, 0.06);
+        --accent-soft-bg-2:  rgba(61, 106, 153, 0.10);
+        --accent-soft-border:rgba(61, 106, 153, 0.28);
+        --on-accent:         #FFFFFF;
+        --text-primary:      #1F2937;
+        --text-secondary:    #3F4856;
+        --text-muted:        #5B6470;
+        --border:            #DCD6C7;
+        --border-strong:     #BFB6A1;
+        --surface-overlay:   rgba(31, 41, 55, 0.04);
+        --surface-overlay-2: rgba(31, 41, 55, 0.07);
+        --surface-overlay-3: rgba(31, 41, 55, 0.02);
+        --divider-dashed:    rgba(31, 41, 55, 0.10);
+        --success:           #3F7A5C;
+        --success-soft-bg:   rgba(63, 122, 92, 0.08);
+        --success-soft-border:rgba(63, 122, 92, 0.30);
+        --warning:           #A35E3A;
+        --warning-strong:    #8A4D2E;
+        --warning-soft-bg:   rgba(163, 94, 58, 0.08);
+        --warning-soft-bg-2: rgba(163, 94, 58, 0.12);
+        --warning-soft-border:rgba(163, 94, 58, 0.30);
+        --error:             #B14A4A;
+        --error-soft-bg:     rgba(177, 74, 74, 0.07);
+        --error-soft-bg-2:   rgba(177, 74, 74, 0.10);
+        --error-soft-border: rgba(177, 74, 74, 0.32);
+        --highlight:         #C9A24A;
+      }
+    }
+
+    /* Smooth color transitions when the theme flips. */
+    html, body, body * {
+      transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
     }
 
     /* ── Base ───────────────────────────────────────────────────── */
@@ -67,6 +179,20 @@
     }
   </style>
 
+  <!-- Theme bootstrap: read saved preference (or system) and apply
+       BEFORE first paint to avoid a light/dark flash. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('pb-theme'); // 'light' | 'dark' | 'system' | null
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+        // 'system' or null: leave attribute off so prefers-color-scheme wins.
+      } catch (e) { /* localStorage may be blocked; fall back to system */ }
+    })();
+  </script>
+
   {% block head %}{% endblock %}
 </head>
 
@@ -98,7 +224,7 @@
     <span style="
       background: var(--accent-glow);
       color: var(--accent);
-      border: 1px solid rgba(59,130,246,0.35);
+      border: 1px solid var(--accent-soft-border);
       font-size: 0.65rem;
       font-weight: 600;
       letter-spacing: 0.06em;

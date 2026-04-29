@@ -297,8 +297,13 @@ def test_chat_html_handler_and_history():
     # CSS exists for the new affordances
     assert ".bubble-actions" in src and ".bubble-action-btn" in src, \
         "bubble-actions CSS missing"
-    assert ".err-chip" in src and "rgba(245,158,11" in src, \
-        "err-chip CSS missing or wrong tone"
+    # Milestone O: tokenized warning palette. Accept either the legacy raw
+    # rgba (pre-O) or the new --warning-soft-* token aliases.
+    assert ".err-chip" in src and (
+        "rgba(245,158,11" in src
+        or "--warning-soft-bg" in src
+        or "--warning-soft-border" in src
+    ), "err-chip CSS missing or wrong tone"
     assertions += 2
 
     # Mobile keeps actions visible at lower opacity
