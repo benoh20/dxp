@@ -104,13 +104,14 @@ DEMO_TILES: list[DemoTile] = [
         "chip":      "Social pack",
         "chip_kind": "social",
         "headline":  "Social media pack for GA-07 youth turnout",
-        "preview":   "Meta mobilization, YouTube persuasion, TikTok hook, grounded in research.",
+        "preview":   "Pair with the Mobilization mode toggle for GOTV-shaped CTAs across all eight formats.",
         "prompt": (
             "Build a social media pack for Georgia's 7th Congressional "
             "District youth turnout (18 to 29). Generate the Meta post, "
             "YouTube script, and TikTok script alongside the standard "
             "canvassing and phone outputs. Lead with cost-of-living framing "
-            "where it fits the research."
+            "where it fits the research. Tip: switch the input-bar Mode "
+            "toggle to Mobilization for GOTV-shaped CTAs."
         ),
     },
     {
