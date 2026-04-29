@@ -197,7 +197,14 @@ assert_(
     ".demo-tile-chip--social" in chat_html,
     "missing .demo-tile-chip--social CSS in chat.html",
 )
-assert_("20, 184, 166" in chat_html, "expected teal color (rgb 20,184,166) for social chip")
+# Milestone O: social chip is now tokenized to --success-soft-* so it tracks
+# the active theme (sage in light + dark). Accept either the legacy teal rgba
+# or the new token reference.
+assert_(
+    "20, 184, 166" in chat_html
+    or (".demo-tile-chip--social" in chat_html and "--success-soft" in chat_html),
+    "social chip should use a distinct success/teal color or token",
+)
 print("PASS section 8 (CSS for social chip): 2 checks")
 
 # ---------------------------------------------------------------------------

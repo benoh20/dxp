@@ -27,7 +27,7 @@
         justify-content: center;
         width: 48px; height: 48px;
         background: var(--accent-glow);
-        border: 1px solid rgba(59,130,246,0.3);
+        border: 1px solid var(--accent-soft-border);
         border-radius: 12px;
         margin-bottom: 1rem;
       ">
@@ -47,8 +47,8 @@
     <!-- Error message -->
     {% if error %}
     <div style="
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.4);
+      background: var(--error-soft-bg);
+      border: 1px solid var(--error-soft-border);
       color: var(--error);
       border-radius: 8px;
       padding: 0.65rem 0.875rem;
@@ -109,7 +109,7 @@
           display: block;
           width: 100%;
           background: var(--accent);
-          color: #fff;
+          color: var(--on-accent);
           border: none;
           border-radius: 8px;
           padding: 0.75rem;
