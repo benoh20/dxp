@@ -1131,7 +1131,7 @@
     <!-- New conversation -->
     <div style="padding:0.875rem 0.75rem 0.5rem;">
       <a href="/chat/?new=1" class="sidebar-new-btn">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M8 3v10M3 8h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
         </svg>
         New conversation
@@ -1181,7 +1181,7 @@
   <div class="chat-main">
 
     <!-- ── Message thread ─────────────────────────────────────── -->
-    <div class="chat-scroll" id="chat-scroll">
+    <div class="chat-scroll" id="chat-scroll" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false" aria-label="Conversation">
       <div class="chat-thread" id="messages">
 
         {% if current_messages %}
@@ -1357,7 +1357,7 @@
           <div class="empty-state" id="empty-state">
             <div class="empty-hero">
               <div class="empty-hero-icon" aria-hidden="true">
-                <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+                <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <rect width="20" height="20" rx="5" fill="var(--accent)"/>
                   <path d="M7 16.5V3.5a5.5 4 0 0 1 0 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -1454,7 +1454,7 @@
             {% if not DEMO_MODE %}
             <!-- Paperclip -->
             <button type="button" class="input-icon-btn" onclick="document.getElementById('file-input').click()" title="Attach file (.csv, .xlsx, .pdf)" aria-label="Attach file">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
               </svg>
             </button>
@@ -1471,7 +1471,7 @@
 
             <!-- Send -->
             <button type="submit" class="send-btn" id="send-btn" title="Send (Enter)" aria-label="Send">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <line x1="22" y1="2" x2="11" y2="13"/>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
@@ -1482,9 +1482,9 @@
         {% if not DEMO_MODE %}
         <!-- File badge -->
         <div id="file-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           <span id="file-name-label"></span>
-          <button onclick="clearFile()" title="Remove file">×</button>
+          <button type="button" onclick="clearFile()" title="Remove attached file" aria-label="Remove attached file">×</button>
         </div>
         {% endif %}
 

@@ -44,9 +44,9 @@
       </p>
     </div>
 
-    <!-- Error message -->
+    <!-- Error message: role=alert announces immediately to screen readers (Milestone P) -->
     {% if error %}
-    <div style="
+    <div role="alert" style="
       background: rgba(239,68,68,0.08);
       border: 1px solid rgba(239,68,68,0.4);
       color: var(--error);
@@ -58,7 +58,7 @@
       align-items: center;
       gap: 0.5rem;
     ">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex-shrink:0;">
         <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
         <path d="M8 5v3.5M8 11v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
