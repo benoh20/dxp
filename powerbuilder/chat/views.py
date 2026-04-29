@@ -198,6 +198,15 @@ def send_message_view(request):
     if not query:
         return render(request, "partials/message.html", {"error": "Query cannot be empty."})
 
+    # Milestone K: optional A/B-test toggle from the input bar. Truthy
+    # strings ("1", "true", "yes", "on") all map to True; everything else
+    # to False. Manager will normalize again.
+    ab_test_raw = (request.POST.get("ab_test") or "").strip().lower()
+    ab_test = ab_test_raw in ("1", "true", "yes", "on")
+    # Milestone L: optional plan-mode override from the input-bar toggle.
+    # Manager will normalize unknown values to "auto".
+    plan_mode = request.POST.get("plan_mode")
+
     # ── File upload ──────────────────────────────────────────────────────────
     uploaded_file_path = None
     uploaded_file = request.FILES.get("file")
@@ -233,6 +242,8 @@ def send_message_view(request):
             query            = query,
             org_namespace    = request.session.get("org_namespace", "general"),
             uploaded_file_path = uploaded_file_path,
+            ab_test          = ab_test,
+            plan_mode        = plan_mode,
         )
     except Exception as exc:
         logger.exception("Pipeline error: %s", exc)
@@ -400,6 +411,12 @@ def stream_query_view(request):
     if not query:
         return HttpResponse("query parameter required", status=400)
 
+    # Milestone K: optional A/B-test toggle from the input bar.
+    ab_test_raw = (request.GET.get("ab_test") or "").strip().lower()
+    ab_test = ab_test_raw in ("1", "true", "yes", "on")
+    # Milestone L: optional plan-mode override from the input-bar toggle.
+    plan_mode = request.GET.get("plan_mode")
+
     org_namespace = request.session.get("org_namespace", "general")
 
     # Demo mode: auto-attach the synthetic Gwinnett voterfile so the voterfile
@@ -427,6 +444,8 @@ def stream_query_view(request):
                 org_namespace      = org_namespace,
                 run_id             = run_id,
                 uploaded_file_path = uploaded_file_path,
+                ab_test            = ab_test,
+                plan_mode          = plan_mode,
             )
         except Exception as exc:
             logger.exception("Streaming pipeline error: %s", exc)

@@ -24,6 +24,16 @@ load_dotenv()
 from ..utils.llm_config import get_completion_client
 
 from .state import AgentState
+from .ab_scaffolding import (
+    AB_PROMPT_INSTRUCTION,
+    AB_ELIGIBLE_FORMATS,
+    DEFAULT_BASELINE_RATE,
+    DEFAULT_MDE,
+    _normalize_ab_test,
+    is_ab_eligible,
+    split_variants,
+    format_ab_math_block,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +147,128 @@ FORMAT_DESCRIPTIONS = {
 }
 
 # Maps ISO 639-1 language codes to a (display_name, native_call_to_arms) pair.
+# ---------------------------------------------------------------------------
+# Milestone L: mobilization vs. persuasion mode
+#
+# Wesleyan Media Project 2024 (https://mediaproject.wesleyan.edu/2024-summary-062425/)
+# documents that mobilization and persuasion are fundamentally different
+# strategic functions in modern campaigns: mobilization turns out existing
+# supporters, persuasion moves undecided voters. Tech for Campaigns 2024
+# (https://www.techforcampaigns.org/results/2024-digital-ads-report) found
+# mobilization-themed creative cost 1.8-5x less per outcome than persuasion-
+# themed creative on the same platforms. The mode toggle lets a user pick
+# the strategic frame explicitly so all eight messaging formats are shaped
+# coherently, instead of the LLM hedging across both at once.
+#
+# "auto" means no override — the manager's existing intent detection runs
+# and the prompts are unchanged from pre-Milestone-L behavior.
+# ---------------------------------------------------------------------------
+
+PLAN_MODES = ("auto", "mobilization", "persuasion")
+
+MODE_LABELS = {
+    "auto":         "Auto",
+    "mobilization": "Mobilization",
+    "persuasion":   "Persuasion",
+}
+
+MODE_DESCRIPTIONS = {
+    "mobilization": (
+        "MOBILIZATION MODE: Audience is supporters who already agree with our position. "
+        "The job is to make voting feel inevitable, social, and urgent. Use ID-as-noun "
+        "framing ('be a voter') over ID-as-verb ('go vote') per Bryan/Walton/Rogers/Dweck "
+        "PNAS 2011. Lead with deadlines, polling locations, and peer-visible action. "
+        "Avoid persuasive argumentation; the audience is already with us. Cheaper per "
+        "outcome at scale per Tech for Campaigns 2024."
+    ),
+    "persuasion": (
+        "PERSUASION MODE: Audience is undecided or soft-opposing voters who can be moved. "
+        "The job is to introduce evidence, address objections, and reframe the choice. "
+        "Allow longer copy, contrast structure (problem -> evidence -> contrast -> ask), "
+        "and named issues from the research findings. Effect sizes are small in absolute "
+        "terms (Coppock/Hill/Vavreck APSR 2024) but log-scaling with model size "
+        "(Hackenburg et al. PNAS 2025), so write tight, specific, falsifiable copy."
+    ),
+    "auto": (
+        "AUTO MODE: No mode override from the user. Use the natural mix of mobilization "
+        "and persuasion appropriate to the research findings and demographic profile."
+    ),
+}
+
+# Per-format CTA shape hint, applied on top of MODE_DESCRIPTIONS. The hint is
+# format-specific because the same mode wants a different verb structure on a
+# door knock vs a TikTok script.
+MODE_CTA_HINTS = {
+    "mobilization": {
+        "canvassing_script": "Close on a same-day or near-future commitment ('Can I count on you to vote on November 5th?').",
+        "phone_script":      "Confirm polling location and a specific time the supporter will go.",
+        "text_script":       "Single clear ask: vote, plan, or check registration. No persuasion text.",
+        "mail_narrative":    "Lead with deadlines and the recipient's polling location. End on a peer-visible action ('join your neighbors').",
+        "digital_copy":      "Headline names a deadline. Body under 280 chars. CTA verb is 'Vote', 'RSVP', 'Pledge'.",
+        "meta_post":         "ID-as-noun construction. Kitchen-table economic anchor. Body under 280 chars.",
+        "youtube_script":    "60-90s. Hook at 0:00 names the deadline or polling moment. End on peer-visible commitment.",
+        "tiktok_script":     "15-30s. Open on the action, not the issue. End on a question that invites duet ('Are you in?').",
+    },
+    "persuasion": {
+        "canvassing_script": "Use deep-canvass structure: ask the voter what matters to them, listen, then connect to research-backed evidence.",
+        "phone_script":      "Allow longer dialogue. Surface one named contrast point from the research findings.",
+        "text_script":       "Two-message exchange: open with a question, follow up with evidence after a reply.",
+        "mail_narrative":    "Long-form contrast structure. Lead with a named issue from research, then evidence, then ask.",
+        "digital_copy":      "Headline poses the contrast. Body cites one piece of research-grounded evidence.",
+        "meta_post":         "Lead with the contrast frame, not the deadline. Body up to 600 chars allowed.",
+        "youtube_script":    "60-90s with explicit timestamp markers (0:00 hook, 0:05 evidence, 0:30 contrast, 0:55 ask).",
+        "tiktok_script":     "15-30s. Open on the surprising claim, end on the source. Lifestyle-wrapped, no party logos.",
+    },
+    "auto": {},  # no per-format override
+}
+
+
+def _normalize_plan_mode(value):
+    """Defensive normalization: accept None, unknown strings, mixed case, etc."""
+    if not isinstance(value, str):
+        return "auto"
+    v = value.strip().lower()
+    if v not in PLAN_MODES:
+        return "auto"
+    return v
+
+
+def _build_mode_directive(plan_mode: str) -> str:
+    """
+    Construct the strategic-frame directive that goes near the top of the
+    messaging prompt, just below the language directive and just above the
+    HARD CONSTRAINT block. Returns an empty string for 'auto' so the prompt
+    is identical to pre-Milestone-L behavior in that case.
+    """
+    plan_mode = _normalize_plan_mode(plan_mode)
+    if plan_mode == "auto":
+        return ""
+    description = MODE_DESCRIPTIONS[plan_mode]
+    return (
+        f"\u2501\u2501\u2501 STRATEGIC FRAME \u2501\u2501\u2501\n"
+        f"{description}\n"
+        f"Apply this frame consistently across all eight messaging sections; do not hedge.\n"
+        f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
+    )
+
+
+def _build_mode_cta_block(plan_mode: str) -> str:
+    """
+    Construct the per-format CTA hints block. Empty string for 'auto'.
+    """
+    plan_mode = _normalize_plan_mode(plan_mode)
+    if plan_mode == "auto":
+        return ""
+    hints = MODE_CTA_HINTS.get(plan_mode, {})
+    if not hints:
+        return ""
+    label = MODE_LABELS[plan_mode].upper()
+    lines = [f"PER-FORMAT CTA SHAPE ({label}):"]
+    for fmt_key, hint in hints.items():
+        lines.append(f"  - {fmt_key}: {hint}")
+    return "\n".join(lines) + "\n\n"
+
+
 # Used to construct the language directive at the top of the prompt and the
 # label in the output header. Add new languages here — messaging.py is the
 # only place a translator-style instruction is needed.
@@ -465,6 +597,14 @@ def messaging_node(state: AgentState) -> dict:
         language_code = "en"
     language_name, language_style = LANGUAGE_LABELS[language_code]
 
+    # Milestone K: A/B scaffolding flag. When True, the prompt asks for two
+    # variants on every eligible social-leaning format and we annotate the
+    # rendered output with explicit Variant A / Variant B labels.
+    ab_test = _normalize_ab_test(state.get("ab_test"))
+    # Milestone L: strategic-frame mode toggle. Defensive normalization so a
+    # malformed payload (None, unknown string) reverts to 'auto'.
+    plan_mode = _normalize_plan_mode(state.get("plan_mode"))
+
     # -----------------------------------------------------------------------
     # 1. Read precinct demographic context from the whiteboard
     # -----------------------------------------------------------------------
@@ -534,10 +674,24 @@ def messaging_node(state: AgentState) -> dict:
             f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
         )
 
+    # Milestone K: Build the A/B-test instruction block. Empty string when
+    # ab_test is False so the prompt is byte-identical to pre-Milestone-K.
+    ab_directive = (
+        f"━━━ A/B TEST DIRECTIVE ━━━\n{AB_PROMPT_INSTRUCTION}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        if ab_test
+        else ""
+    )
+    # Milestone L: build the strategic-frame directive and per-format CTA hints.
+    # Both return empty strings in 'auto' mode, so the prompt is byte-identical
+    # to pre-Milestone-L behavior when the user has not chosen a mode.
+    mode_directive = _build_mode_directive(plan_mode)
+    mode_cta_block = _build_mode_cta_block(plan_mode)
+
     prompt = f"""You are an expert field organizer and political messaging strategist.
 Generate targeted campaign messaging materials for the {district_label}.
 
-{language_directive}━━━ HARD CONSTRAINT — READ CAREFULLY ━━━
+{language_directive}{ab_directive}{mode_directive}━━━ HARD CONSTRAINT — READ CAREFULLY ━━━
 You must draw ALL content EXCLUSIVELY from the RESEARCH FINDINGS section below.
 Do NOT invent statistics, polling numbers, quotes, or claims not present there.
 Do NOT reference issues, demographics, or events not mentioned in the research.
@@ -563,7 +717,7 @@ Generate all eight sections below. Each section must:
 You MUST include each section marker exactly as shown on its own line.
 Do not rename, reorder, or omit any marker.
 
-{SECTION_MARKERS["canvassing_script"]}
+{mode_cta_block}{SECTION_MARKERS["canvassing_script"]}
 {canvassing_instruction}
 
 {SECTION_MARKERS["phone_script"]}
@@ -605,13 +759,50 @@ Do not rename, reorder, or omit any marker.
     # Surface the language in the header so the synthesizer (and any human
     # reviewer) can see at a glance which language was produced.
     lang_tag = f" | LANGUAGE: {language_name}" if language_code != "en" else ""
+    ab_tag   = " | AB: on" if ab_test else ""
+    mode_tag = f" | MODE: {MODE_LABELS[plan_mode]}" if plan_mode != "auto" else ""
+
+    # Milestone K: when A/B mode is active, we prepend the sample-size math
+    # block to the FIRST eligible format we render. The block applies to
+    # every eligible format because they share a baseline conversion model,
+    # so showing it once is enough for the campaign manager.
+    ab_math_prepended = False
+    ab_math = format_ab_math_block(
+        baseline_rate=DEFAULT_BASELINE_RATE,
+        mde=DEFAULT_MDE,
+    ) if ab_test else ""
+
     for key, label in FORMAT_LABELS.items():
         content = sections.get(key)
-        if content:
-            formatted_outputs.append(
-                f"--- MESSAGING OUTPUT: {label} | DISTRICT: {district_label} "
-                f"| RESEARCH DATE: {most_recent_date}{lang_tag} ---\n{content}\n"
+        if not content:
+            continue
+
+        # Milestone K: For eligible formats with A/B on, split the LLM's
+        # output on the variant markers and re-render with explicit
+        # **Variant A** / **Variant B** Markdown headers so reviewers can
+        # eyeball the comparison without hunting through prose.
+        if ab_test and is_ab_eligible(key):
+            split = split_variants(content)
+            rendered_body = (
+                f"**Variant A**\n{split['A']}\n\n"
+                f"**Variant B**\n{split['B']}\n"
             )
+            if split["axis"]:
+                rendered_body += f"\n{split['axis']}\n"
+            content_to_render = rendered_body
+        else:
+            content_to_render = content
+
+        prefix = ""
+        if ab_test and is_ab_eligible(key) and not ab_math_prepended:
+            prefix = ab_math + "\n"
+            ab_math_prepended = True
+
+        formatted_outputs.append(
+            f"--- MESSAGING OUTPUT: {label} | DISTRICT: {district_label} "
+            f"| RESEARCH DATE: {most_recent_date}{lang_tag}{ab_tag}{mode_tag} ---\n"
+            f"{prefix}{content_to_render}\n"
+        )
 
     if not formatted_outputs:
         return {
@@ -646,8 +837,8 @@ Do not rename, reorder, or omit any marker.
 
     logger.info(
         f"MessagingAgent: Generated {len(formatted_outputs)}/8 messaging formats "
-        f"for {district_label} in {language_name} using research dated as "
-        f"recently as {most_recent_date}."
+        f"for {district_label} in {language_name} (ab_test={ab_test}, mode={plan_mode}) "
+        f"using research dated as recently as {most_recent_date}."
     )
 
     return {
