@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Sign in — Powerbuilder{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Sign in: Powerbuilder" %}{% endblock %}
 
 {% block content %}
 <div style="
@@ -40,7 +41,7 @@
         Powerbuilder
       </h1>
       <p style="color:var(--text-secondary); font-size:0.8rem; margin:0; line-height:1.5;">
-        All the data, all the strategy —<br>so you can focus on winning.
+        {% blocktrans %}All the data, all the strategy,<br>so you can focus on winning.{% endblocktrans %}
       </p>
     </div>
 
@@ -78,14 +79,14 @@
         letter-spacing: 0.07em;
         text-transform: uppercase;
         margin-bottom: 0.4rem;
-      ">Password</label>
+      ">{% trans "Password" %}</label>
 
       <input
         type="password"
         name="password"
         autofocus
         autocomplete="current-password"
-        placeholder="Enter access password"
+        placeholder="{% trans 'Enter access password' %}"
         style="
           display: block;
           width: 100%;
@@ -121,7 +122,7 @@
         onmouseover="this.style.background='var(--accent-hover)'"
         onmouseout="this.style.background='var(--accent)'"
       >
-        Sign in
+        {% trans "Sign in" %}
       </button>
     </form>
 
@@ -133,7 +134,7 @@
       margin: 1.5rem 0 0;
       line-height: 1.5;
     ">
-      User accounts and org-level login coming soon.
+      {% trans "User accounts and org-level login coming soon." %}
     </p>
   </div>
 </div>

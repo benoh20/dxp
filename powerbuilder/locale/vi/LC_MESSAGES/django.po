@@ -1,0 +1,121 @@
+# Vietnamese translation for Powerbuilder UI.
+# DRAFT — flagged for native-speaker review before any production rollout.
+# Translator notes: register is informal-respectful, suitable for community
+# organizing (use "bạn" for the user; avoid overly formal "quý vị" outside
+# of formal mailers). Tone is warm and direct. Vietnamese organizing-tone
+# formality registers vary by region and generation, so this draft MUST be
+# reviewed by a native speaker familiar with the target community
+# (Vietnamese American voters in Gwinnett County / GA-07) before launch.
+# Do NOT translate proper nouns: Powerbuilder, OpenAI, Pinecone, Census
+# API, FEC, Gwinnett, Beta.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: powerbuilder 0.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-29 00:29-0400\n"
+"PO-Revision-Date: 2026-04-29 00:30-0400\n"
+"Last-Translator: Powerbuilder team (DRAFT, pending native review)\n"
+"Language-Team: Vietnamese <vi@li.org>\n"
+"Language: vi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "English"
+msgstr "Tiếng Anh"
+
+msgid "Español"
+msgstr "Tiếng Tây Ban Nha"
+
+msgid "Tiếng Việt"
+msgstr "Tiếng Việt"
+
+msgid "Powerbuilder"
+msgstr "Powerbuilder"
+
+msgid "Beta"
+msgstr "Beta"
+
+msgid "Language"
+msgstr "Ngôn ngữ"
+
+#, python-format
+msgid "Switch language to %(lang)s"
+msgstr "Chuyển ngôn ngữ sang %(lang)s"
+
+msgid "Chat: Powerbuilder"
+msgstr "Trò chuyện: Powerbuilder"
+
+msgid "Toggle conversation list"
+msgstr "Mở hoặc đóng danh sách cuộc trò chuyện"
+
+msgid "New conversation"
+msgstr "Cuộc trò chuyện mới"
+
+msgid "Delete conversation"
+msgstr "Xoá cuộc trò chuyện"
+
+msgid "No conversations yet"
+msgstr "Chưa có cuộc trò chuyện nào"
+
+msgid "Powered by OpenAI, Pinecone, Census API"
+msgstr "Được hỗ trợ bởi OpenAI, Pinecone, Census API"
+
+msgid "What can I help you win?"
+msgstr "Tôi có thể giúp bạn giành chiến thắng ở đâu?"
+
+msgid "Pick a starter below or ask your own question."
+msgstr "Chọn một gợi ý bên dưới hoặc đặt câu hỏi của riêng bạn."
+
+msgid "Loads into the input box. Edit anything, then hit send."
+msgstr "Sẽ được tải vào ô nhập. Chỉnh sửa tuỳ ý rồi bấm gửi."
+
+msgid ""
+"<span class=\"vf-chip-strong\">Synthetic voterfile</span>, 50K Gwinnett rows "
+"attached"
+msgstr ""
+"<span class=\"vf-chip-strong\">Danh sách cử tri mô phỏng</span>, đính kèm "
+"50.000 dòng dữ liệu của Gwinnett"
+
+msgid "Editing: submit will rerun and replace the previous response."
+msgstr "Đang chỉnh sửa: khi gửi, hệ thống sẽ chạy lại và thay câu trả lời trước."
+
+msgid "Cancel edit"
+msgstr "Huỷ chỉnh sửa"
+
+msgid "Ask Powerbuilder about your district, candidates, win numbers..."
+msgstr "Hỏi Powerbuilder về khu vực, ứng viên, hoặc số phiếu cần để thắng..."
+
+msgid "Message"
+msgstr "Tin nhắn"
+
+msgid "Send (Enter)"
+msgstr "Gửi (Enter)"
+
+msgid "Send"
+msgstr "Gửi"
+
+msgid ""
+"Powerbuilder analyzes your query using live Census, FEC, and election data."
+msgstr ""
+"Powerbuilder phân tích câu hỏi của bạn bằng dữ liệu thời gian thực từ Census, FEC và bầu cử."
+
+msgid "Sign in: Powerbuilder"
+msgstr "Đăng nhập: Powerbuilder"
+
+msgid "All the data, all the strategy,<br>so you can focus on winning."
+msgstr "Mọi dữ liệu, mọi chiến lược,<br>để bạn tập trung vào việc giành chiến thắng."
+
+msgid "Password"
+msgstr "Mật khẩu"
+
+msgid "Enter access password"
+msgstr "Nhập mật khẩu truy cập"
+
+msgid "Sign in"
+msgstr "Đăng nhập"
+
+msgid "User accounts and org-level login coming soon."
+msgstr "Tài khoản người dùng và đăng nhập cấp tổ chức sẽ sớm có."

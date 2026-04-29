@@ -102,6 +102,9 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # LocaleMiddleware must come AFTER SessionMiddleware (so it can read the
+    # session) and BEFORE CommonMiddleware (so URL resolution sees the locale).
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -132,6 +135,9 @@ TEMPLATES = [
                 # Exposes DEMO_MODE to every template so we can hide the
                 # file upload UI and other admin affordances during a live demo.
                 'chat.context_processors.demo_flags',
+                # i18n context processor exposes LANGUAGES and LANGUAGE_CODE
+                # to every template (Milestone Q).
+                'django.template.context_processors.i18n',
             ],
         },
     },
@@ -173,11 +179,28 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
+
+# Languages we ship UI translations for. Spanish and Vietnamese reflect the
+# two largest non-English home languages in Gwinnett County (GA-07). Native
+# speakers should review the .po files before any production rollout.
+from django.utils.translation import gettext_lazy as _
+
+LANGUAGES = [
+    ('en', _('English')),
+    ('es', _('Espa\u00f1ol')),
+    ('vi', _('Ti\u1ebfng Vi\u1ec7t')),
+]
+
+# Where Django looks for compiled .mo files at runtime.
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
+USE_L10N = True
 
 USE_TZ = True
 

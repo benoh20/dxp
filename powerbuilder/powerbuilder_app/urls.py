@@ -7,5 +7,9 @@ from django.urls import include, path
 # so a public deployment doesn't expose /admin/ at the obvious URL.
 urlpatterns = [
     path(settings.ADMIN_URL_PATH, admin.site.urls),
+    # Django built-in i18n routes: /i18n/setlang/ accepts a POST with
+    # `language` and `next` and stores the choice in a cookie + session.
+    # Wired in Milestone Q so the language switcher in the sidebar works.
+    path("i18n/", include("django.conf.urls.i18n")),
     path("", include("chat.urls")),
 ]

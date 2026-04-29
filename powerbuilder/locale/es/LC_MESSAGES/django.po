@@ -1,0 +1,118 @@
+# Spanish (Castilian/neutral Latin American) translation for Powerbuilder UI.
+# DRAFT — flagged for native-speaker review before any production rollout.
+# Translator notes: tone is warm but professional, leaning Latin American
+# neutral (no peninsular vosotros). Tú-form address everywhere; usted only
+# in formal mailers (which are not in the UI surface). Mirror the casual,
+# action-oriented voice of the English source. Do NOT translate proper
+# nouns: Powerbuilder, OpenAI, Pinecone, Census API, FEC, Gwinnett, Beta.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: powerbuilder 0.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-04-29 00:29-0400\n"
+"PO-Revision-Date: 2026-04-29 00:30-0400\n"
+"Last-Translator: Powerbuilder team (DRAFT, pending native review)\n"
+"Language-Team: Spanish <es@li.org>\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "English"
+msgstr "Inglés"
+
+msgid "Español"
+msgstr "Español"
+
+msgid "Tiếng Việt"
+msgstr "Tiếng Việt"
+
+msgid "Powerbuilder"
+msgstr "Powerbuilder"
+
+msgid "Beta"
+msgstr "Beta"
+
+msgid "Language"
+msgstr "Idioma"
+
+#, python-format
+msgid "Switch language to %(lang)s"
+msgstr "Cambiar idioma a %(lang)s"
+
+msgid "Chat: Powerbuilder"
+msgstr "Chat: Powerbuilder"
+
+msgid "Toggle conversation list"
+msgstr "Mostrar u ocultar la lista de conversaciones"
+
+msgid "New conversation"
+msgstr "Nueva conversación"
+
+msgid "Delete conversation"
+msgstr "Eliminar conversación"
+
+msgid "No conversations yet"
+msgstr "Aún no hay conversaciones"
+
+msgid "Powered by OpenAI, Pinecone, Census API"
+msgstr "Con tecnología de OpenAI, Pinecone, Census API"
+
+msgid "What can I help you win?"
+msgstr "¿Qué te ayudo a ganar?"
+
+msgid "Pick a starter below or ask your own question."
+msgstr "Elige una sugerencia abajo o haz tu propia pregunta."
+
+msgid "Loads into the input box. Edit anything, then hit send."
+msgstr "Se carga en el cuadro de texto. Edita lo que quieras y luego envía."
+
+msgid ""
+"<span class=\"vf-chip-strong\">Synthetic voterfile</span>, 50K Gwinnett rows "
+"attached"
+msgstr ""
+"<span class=\"vf-chip-strong\">Padrón sintético</span>, 50 mil filas de "
+"Gwinnett adjuntas"
+
+msgid "Editing: submit will rerun and replace the previous response."
+msgstr "Editando: al enviar se volverá a ejecutar y reemplazará la respuesta anterior."
+
+msgid "Cancel edit"
+msgstr "Cancelar edición"
+
+msgid "Ask Powerbuilder about your district, candidates, win numbers..."
+msgstr "Pregunta a Powerbuilder sobre tu distrito, candidatos, votos para ganar..."
+
+msgid "Message"
+msgstr "Mensaje"
+
+msgid "Send (Enter)"
+msgstr "Enviar (Intro)"
+
+msgid "Send"
+msgstr "Enviar"
+
+msgid ""
+"Powerbuilder analyzes your query using live Census, FEC, and election data."
+msgstr ""
+"Powerbuilder analiza tu consulta con datos en vivo del Census, la FEC y elecciones."
+
+msgid "Sign in: Powerbuilder"
+msgstr "Iniciar sesión: Powerbuilder"
+
+msgid "All the data, all the strategy,<br>so you can focus on winning."
+msgstr "Todos los datos, toda la estrategia,<br>para que te enfoques en ganar."
+
+msgid "Password"
+msgstr "Contraseña"
+
+msgid "Enter access password"
+msgstr "Ingresa la contraseña de acceso"
+
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+msgid "User accounts and org-level login coming soon."
+msgstr "Cuentas de usuario y acceso por organización: próximamente."

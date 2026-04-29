@@ -232,7 +232,9 @@ print(f"PASS section J: {n} checks")
 # ═══════════════════════════════════════════════════════════════════════
 print("=== (K) <html lang> set ===")
 n = 0
-expect(re.search(r'<html lang="[a-z]{2}', BASE_HTML),
+# Milestone Q i18n made <html lang> dynamic via Django LANGUAGE_CODE; accept
+# either a literal 2-letter code or a Django template expression.
+expect(re.search(r'<html lang="(?:[a-z]{2}|\{\{[^}]*LANGUAGE_CODE[^}]*\}\})', BASE_HTML),
        "<html> has a lang attribute")
 n += 1
 print(f"PASS section K: {n} checks")
