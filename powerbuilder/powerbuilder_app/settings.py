@@ -101,6 +101,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise serves collected static files directly from the WSGI process.
+    # Must come immediately after SecurityMiddleware (per WhiteNoise docs) and
+    # before any middleware that produces responses, so static asset requests
+    # short-circuit the rest of the stack. No-op in dev when DEBUG=True —
+    # Django's runserver still serves static files itself.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     # LocaleMiddleware must come AFTER SessionMiddleware (so it can read the
     # session) and BEFORE CommonMiddleware (so URL resolution sees the locale).
@@ -211,3 +217,15 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Compressed + manifest hashing for production static serving via WhiteNoise.
+# Each file gets a content-hash suffix so we can serve them with far-future
+# Cache-Control headers without worrying about stale assets after a deploy.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}

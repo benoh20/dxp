@@ -1,0 +1,96 @@
+# Render deploy configuration for Powerbuilder preview environment.
+#
+# This file describes a single web service. Render reads it when the GitHub
+# repo is connected via "New + Blueprint" in the dashboard. Once Render
+# applies it, the service auto-deploys on every push to main.
+#
+# Production still ships from the DigitalOcean droplet via DEPLOY.md. This
+# file does not affect that path; it only powers the *.onrender.com preview.
+#
+# Note on layout: the Django project lives in the `powerbuilder/` subfolder
+# of the repo, so build and start commands `cd` into it first.
+
+services:
+  - type: web
+    name: powerbuilder-preview
+    runtime: python
+    plan: free                 # Free tier; sleeps after 15 min idle, ok for demos
+    region: oregon             # Nearest free-tier region; change later if needed
+    branch: main               # Auto-deploy on every push to main
+    autoDeploy: true
+
+    # Pin the Python version so build output is reproducible. 3.12 matches
+    # what the droplet runs and what we develop against locally.
+    pythonVersion: "3.12"
+
+    # Build phase runs on every deploy:
+    #   1. Install Python deps
+    #   2. Collect static files into staticfiles/ (WhiteNoise serves these)
+    #   3. Apply database migrations (SQLite, ephemeral on free tier)
+    #   4. Compile gettext .mo files for es and vi (Milestone Q i18n)
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r powerbuilder/requirements.txt
+      cd powerbuilder
+      python manage.py collectstatic --noinput
+      python manage.py migrate --noinput
+      # Compile per-locale .mo files. Use msgfmt directly because
+      # manage.py compilemessages scans the venv on Render and chokes.
+      for loc in es vi; do
+        if [ -f "locale/$loc/LC_MESSAGES/django.po" ]; then
+          msgfmt "locale/$loc/LC_MESSAGES/django.po" \
+            -o "locale/$loc/LC_MESSAGES/django.mo"
+        fi
+      done
+
+    # Start phase: gunicorn binds to the port Render injects via $PORT.
+    # 2 workers + 2 threads is the right shape for free tier (512 MB RAM).
+    startCommand: |
+      cd powerbuilder && gunicorn powerbuilder_app.wsgi:application \
+        --bind 0.0.0.0:$PORT \
+        --workers 2 \
+        --threads 2 \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile -
+
+    # Health check: Django's login page returns 200 unauthenticated, so
+    # Render's pinger can use it to verify the service is healthy.
+    healthCheckPath: /login/
+
+    envVars:
+      # Render-injected: a long random string. Generated once and stored.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Production-safe defaults. DEBUG must stay False on a public URL.
+      - key: DEBUG
+        value: "False"
+
+      # Allow the *.onrender.com hostname Render assigns. The wildcard form
+      # also covers PR preview environments if we ever turn those on.
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+
+      # CSRF: Render serves over HTTPS, and the Django form posts go to the
+      # same hostname, so we trust *.onrender.com here too.
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+
+      # The following are NOT generated. You set them in the Render dashboard
+      # under Environment after the service is created. Keeping them listed
+      # here (with sync: false) tells Render "this var is required, prompt
+      # the user, do not auto-generate, do not commit a value to git".
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: OPENAI_PINECONE_INDEX_NAME
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+
+      # Demo mode toggle. ON for the preview environment so visitors see the
+      # canned-prompt experience without burning real OpenAI calls.
+      - key: DEMO_MODE
+        value: "true"
