@@ -60,13 +60,148 @@ EXPORTS_DIR = os.getenv(
     os.path.abspath(os.path.join(os.path.dirname(__file__), "../../exports")),
 )
 
+# ---------------------------------------------------------------------------
+# Organizer-native voice (Milestone R, Plan A)
+#
+# Powerbuilder writes in the voice of the popular-education organizing
+# tradition (re:power, Wellstone, Ruckus, FWD.us Community Accelerator).
+# That means three things, enforced by SYSTEM_PROMPT and _build_prompt:
+#
+#   1. The opening paragraph names a Theory of Change in the form
+#      "If we do X, then Y will happen" before any tactics.
+#   2. The body uses canonical organizing vocabulary (base, target,
+#      persuadable, ladder of engagement, etc.) instead of generic
+#      marketing terms (followers, reach, conversion).
+#   3. A short "What this won't do" footer names the limits of the plan
+#      so the user knows where human judgment still has to step in.
+#
+# Power type is inferred from the user query using keyword scoring (see
+# _infer_power_type below). The result is surfaced both to the LLM and
+# to structured_data so the chat UI can render a Power Type chip.
+# ---------------------------------------------------------------------------
+
+POWER_TYPES = {
+    "through": {
+        "label": "Power Through",
+        "definition": "taking power via electoral or state mechanisms (winning office, winning legislation, winning the budget)",
+    },
+    "over": {
+        "label": "Power Over",
+        "definition": "forcing institutions or decision-makers to concede through public pressure, escalation, or disruption",
+    },
+    "with": {
+        "label": "Power With",
+        "definition": "building alternative structures and mutual-aid capacity inside the community itself",
+    },
+}
+
+# Keyword → power type. Scored by simple substring count on the lowercased
+# query plus the active_agents list. The keyword sets are intentionally short
+# and high-signal: a term that points clearly at one of the three power types.
+_POWER_TYPE_KEYWORDS = {
+    "through": [
+        "election", "electoral", "voter", "vote", "ballot", "precinct",
+        "turnout", "primary", "general election", "candidate", "campaign",
+        "district", "win number", "gotv", "register", "poll",
+    ],
+    "over": [
+        "pressure", "target", "decision-maker", "decision maker",
+        "protest", "march", "rally", "boycott", "escalat", "disrupt",
+        "corporate", "council", "city hall", "sit-in", "strike",
+        "legislator", "lobby", "demand", "accountab",
+    ],
+    "with": [
+        "mutual aid", "co-op", "cooperative", "community fridge",
+        "deportation defense", "know your rights", "care work",
+        "caregiv", "tenant", "union drive", "alternative", "build base",
+        "base building", "leader development", "popular education",
+    ],
+}
+
+# Canonical organizing vocabulary (subset of the 30-term glossary in
+# notes/organizing_pdfs_analysis.md). Injected verbatim into the user
+# prompt so the LLM has the exact phrasing on hand when it writes.
+ORGANIZING_GLOSSARY = (
+    "- base: people already aligned with the cause, who must be activated.\n"
+    "- base building: ongoing work of expanding the number of committed supporters.\n"
+    "- constituency: the population whose interests we represent and organize.\n"
+    "- target: the specific decision-maker with power to grant our demands.\n"
+    "- theory of change: causal logic in the form 'If we do X, then Y will happen'.\n"
+    "- ladder of engagement: progression from low-commitment to high-commitment actions.\n"
+    "- rung: one step on the ladder of engagement.\n"
+    "- persuadable: person not yet committed who could be moved with the right framing.\n"
+    "- power map: visual tool plotting stakeholders by power level and alignment.\n"
+    "- spectrum of allies: continuum from active support to active opposition.\n"
+    "- escalation: deliberate increase in pressure or disruption across a campaign arc.\n"
+    "- polarize: deliberately force people to take sides, reducing the number of bystanders.\n"
+    "- PSAA: content structure of Problem, Solution, Action, Ask.\n"
+    "- mobilize vs. organize: mobilize activates known supporters, organize develops new leaders.\n"
+    "- declare victory and run: publish a momentum-sustaining win frame even when full demands are not met."
+)
+
+GENERIC_TO_ORGANIZER = (
+    "When tempted to write 'followers' say 'base'. When tempted to write 'audience' "
+    "say 'constituency' or 'persuadable audience'. When tempted to write 'engagement "
+    "funnel' say 'ladder of engagement'. When tempted to write 'call to action' say "
+    "'ask' and locate it on a specific rung. Never substitute marketing language for "
+    "organizing language."
+)
+
+
+def _infer_power_type(query: str, active_agents: list | None = None) -> str:
+    """
+    Infer which of the three re:power power types this query is building.
+
+    Returns one of 'through', 'over', 'with'. Falls back to 'through' on a
+    tie or when nothing matches, since the most common Powerbuilder query
+    is a partisan electoral run (researcher + win_number + precincts +
+    messaging + cost_calculator). Scoring is intentionally tiny so it is
+    cheap to run on every synthesis call and easy to reason about in tests.
+    """
+    haystack = (query or "").lower()
+    if active_agents:
+        haystack = haystack + " " + " ".join(str(a).lower() for a in active_agents)
+
+    scores = {key: 0 for key in POWER_TYPES}
+    for key, terms in _POWER_TYPE_KEYWORDS.items():
+        for term in terms:
+            if term in haystack:
+                scores[key] += 1
+
+    # Electoral signal from the agent list: if any of researcher,
+    # election_results, win_number, precincts ran, that is a Power Through
+    # signal worth one extra point so the tiebreaker leans correctly.
+    if active_agents:
+        agent_set = {str(a).lower() for a in active_agents}
+        if agent_set & {"election_results", "win_number", "precincts"}:
+            scores["through"] += 1
+
+    best_score = max(scores.values())
+    if best_score == 0:
+        return "through"
+    # On tie, prefer the order through > over > with (most common first).
+    for key in ("through", "over", "with"):
+        if scores[key] == best_score:
+            return key
+    return "through"
+
+
 SYSTEM_PROMPT = (
-    "You are a senior political strategist. You have received findings from specialist "
-    "analysts. Synthesize them into a single clear non-repetitive professional program "
-    "briefing written in first person plural ('we', 'our campaign'). "
+    "You are a senior organizer in the popular-education tradition (re:power, "
+    "Wellstone, Ruckus Society, FWD.us Community Accelerator). You have received "
+    "findings from specialist analysts. Synthesize them into a single clear "
+    "non-repetitive professional briefing written in first person plural "
+    "('we', 'our campaign'). "
+    "Methodology comes before tactics. Open every briefing with an explicit "
+    "Theory of Change in the form 'If we do X, then Y will happen' before "
+    "naming any tactic, channel, or content. "
+    "Use canonical organizing vocabulary (base, persuadable, target, ladder "
+    "of engagement, rung, spectrum of allies, escalation, mobilize vs. "
+    "organize, PSAA), not generic marketing language (followers, audience "
+    "reach, engagement funnel, conversion). "
     "Do not invent information not present in the inputs. "
-    "Defer to the most specific and most recently dated source when findings conflict. "
-    "Do not mention AI, agents, or automated tools."
+    "Defer to the most specific and most recently dated source when findings "
+    "conflict. Do not mention AI, agents, or automated tools."
 )
 
 # Agents whose presence together signals a full political plan run.
@@ -276,16 +411,39 @@ def _build_prompt(
     errors: list,
     is_plan: bool,
     district_label: str,
+    power_type: str = "through",
 ) -> str:
 
     error_block = ""
     if errors:
         error_block = (
             "\n⚠️ The following agents encountered issues and their outputs may be "
-            "incomplete — note this where relevant:\n"
+            "incomplete, note this where relevant:\n"
             + "\n".join(f"  - {e}" for e in errors)
             + "\n"
         )
+
+    pt = POWER_TYPES.get(power_type, POWER_TYPES["through"])
+    power_block = (
+        f"\nINFERRED POWER TYPE: {pt['label']} ({pt['definition']}).\n"
+        "Frame the Theory of Change in the opening paragraph against this power type "
+        "and reference it once more by name when explaining strategy.\n"
+    )
+
+    glossary_block = (
+        "\nCANONICAL ORGANIZING VOCABULARY (use these terms over generic marketing language):\n"
+        f"{ORGANIZING_GLOSSARY}\n\n{GENERIC_TO_ORGANIZER}\n"
+    )
+
+    wont_do_block = (
+        "\nAfter the main content, append a final H2 section titled exactly "
+        "'What This Won\u2019t Do' (use a curly apostrophe). In 2 to 4 short bullets, "
+        "name the limits of this plan that still require human judgment, for example: "
+        "this plan does not replace 1:1 conversations with the base, this plan does not "
+        "include voter file or VAN access, this plan assumes the named target is the "
+        "correct decision-maker (verify before escalation), this plan does not handle "
+        "rapid-response decisions in real time. Pick limits that actually fit the briefing.\n"
+    )
 
     if is_plan:
         structure = f"""
@@ -328,18 +486,23 @@ Do not reproduce raw numbers in a table — the win number table will be inserte
 
 ## Program Recommendations
 3–5 concrete, prioritised action items for the campaign with rationale for each.
+Name each as a rung on the ladder of engagement where it fits.
 
-End with (italicised):
+{wont_do_block}
+Then end with (italicised):
 {_ATTRIBUTION}
 """
     else:
         structure = f"""
-Produce a professional program briefing in Markdown responding to: "{query}"
+Produce a professional organizer briefing in Markdown responding to: "{query}"
 Use H2 for major sections. Use bullet lists and bold for emphasis.
-End with: {_ATTRIBUTION}
+The first paragraph must state the Theory of Change in the form
+"If we do X, then Y will happen" before any tactics.
+{wont_do_block}
+Then end with: {_ATTRIBUTION}
 """
 
-    return f"""{error_block}
+    return f"""{error_block}{power_block}{glossary_block}
 USER REQUEST: {query}
 AGENTS THAT CONTRIBUTED: {', '.join(active_agents) if active_agents else 'none'}
 
@@ -363,6 +526,8 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
     structured_ctx = str(structured_data) if structured_data else "No structured data collected."
     district_lbl   = _district_label(structured_data)
 
+    power_type = _infer_power_type(state.get("query", ""), active_agents)
+
     prompt = _build_prompt(
         query=state.get("query", ""),
         research_context=research_ctx,
@@ -371,6 +536,7 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
         errors=errors,
         is_plan=is_plan,
         district_label=district_lbl,
+        power_type=power_type,
     )
 
     llm = get_completion_client(temperature=0.3)
@@ -880,6 +1046,19 @@ def export_node(state: AgentState) -> dict:
     is_plan      = PLAN_AGENTS.issubset(set(active_agents))
     district_lbl = _district_label(structured_data)
 
+    # Compute the inferred power type up front so it is available both to
+    # the synthesizer prompt and to the structured_data the UI reads. Note:
+    # AgentState.structured_data uses operator.add as its reducer, so we
+    # return ONLY the new power_type entry from this node and let LangGraph
+    # merge it into the running list.
+    inferred_power = _infer_power_type(state.get("query", ""), active_agents)
+    power_meta = {
+        "agent": "power_type",
+        "power_type": inferred_power,
+        "label": POWER_TYPES[inferred_power]["label"],
+        "definition": POWER_TYPES[inferred_power]["definition"],
+    }
+
     # -----------------------------------------------------------------------
     # 1. Synthesize
     # -----------------------------------------------------------------------
@@ -939,8 +1118,13 @@ def export_node(state: AgentState) -> dict:
     if generated_files:
         result["generated_files"] = generated_files
 
+    # Append the power_type entry to structured_data via the operator.add
+    # reducer so the chat UI and tests can read it without having to call
+    # _infer_power_type again.
+    result["structured_data"] = [power_meta]
+
     logger.info(
         f"ExportAgent: format={'docx(plan)' if is_plan else output_format} | "
-        f"district={district_lbl} | files={generated_files or 'none'}"
+        f"district={district_lbl} | power={inferred_power} | files={generated_files or 'none'}"
     )
     return result
