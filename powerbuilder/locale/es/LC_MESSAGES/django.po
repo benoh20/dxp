@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: powerbuilder 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 21:49-0400\n"
+"POT-Creation-Date: 2026-04-30 13:39-0400\n"
 "PO-Revision-Date: 2026-04-29 00:30-0400\n"
 "Last-Translator: Powerbuilder team (DRAFT, pending native review)\n"
 "Language-Team: Spanish <es@li.org>\n"
@@ -224,6 +224,34 @@ msgstr "Eliminar conversación"
 msgid "No conversations yet"
 msgstr "Aún no hay conversaciones"
 
+#: templates/chat.html:1310 templates/chat.html:1311
+msgid "Theme"
+msgstr "Tema"
+
+#: templates/chat.html:1314
+msgid "Follow your device setting"
+msgstr "Sigue la preferencia del dispositivo"
+
+#: templates/chat.html:1314
+msgid "System"
+msgstr "Sistema"
+
+#: templates/chat.html:1316
+msgid "Always light"
+msgstr "Siempre claro"
+
+#: templates/chat.html:1316
+msgid "Light"
+msgstr "Claro"
+
+#: templates/chat.html:1318
+msgid "Always dark"
+msgstr "Siempre oscuro"
+
+#: templates/chat.html:1318
+msgid "Dark"
+msgstr "Oscuro"
+
 #: templates/chat.html:1325
 msgid "Powered by OpenAI, Pinecone, Census API"
 msgstr "Con tecnología de OpenAI, Pinecone, Census API"
@@ -275,7 +303,71 @@ msgstr "Enviar (Intro)"
 msgid "Send"
 msgstr "Enviar"
 
-#: templates/chat.html:1666
+#: templates/chat.html:1634
+msgid "A/B test toggle"
+msgstr "Activar prueba A/B"
+
+#: templates/chat.html:1635
+msgid "Generate two variants of every social messaging output"
+msgstr "Genera dos variantes de cada mensaje en redes sociales"
+
+#: templates/chat.html:1637
+msgid "A/B test variants"
+msgstr "Variantes A/B"
+
+#: templates/chat.html:1640 templates/chat.html:1641
+msgid "Off (single variant per format)."
+msgstr "Apagado (una sola variante por formato)."
+
+#: templates/chat.html:1641
+msgid "On: two variants per social format + sample-size math."
+msgstr "Activado: dos variantes por formato más cálculo de tamaño de muestra."
+
+#: templates/chat.html:1647
+msgid "Plan mode"
+msgstr "Modo del plan"
+
+#: templates/chat.html:1648
+msgid "Mode"
+msgstr "Modo"
+
+#: templates/chat.html:1650
+msgid "Let Powerbuilder pick the natural mix"
+msgstr "Deja que Powerbuilder elija la mezcla natural"
+
+#: templates/chat.html:1650
+msgid "Auto"
+msgstr "Auto"
+
+#: templates/chat.html:1651
+msgid "GOTV: speak to supporters who already agree"
+msgstr "GOTV: habla con quienes ya están de tu lado"
+
+#: templates/chat.html:1651
+msgid "Mobilization"
+msgstr "Movilización"
+
+#: templates/chat.html:1652
+msgid "Move undecided or soft-opposing voters"
+msgstr "Mueve a votantes indecisos o con oposición leve"
+
+#: templates/chat.html:1652
+msgid "Persuasion"
+msgstr "Persuasión"
+
+#: templates/chat.html:1655 templates/chat.html:1657
+msgid "Auto picks the mix."
+msgstr "Auto elige la mezcla."
+
+#: templates/chat.html:1656
+msgid "GOTV your supporters."
+msgstr "GOTV con tu base."
+
+#: templates/chat.html:1657
+msgid "Move undecided voters."
+msgstr "Mueve a indecisos."
+
+#: templates/chat.html:1671
 msgid ""
 "Powerbuilder analyzes your query using live Census, FEC, and election data."
 msgstr ""
@@ -303,7 +395,6 @@ msgid "User accounts and org-level login coming soon."
 msgstr "Cuentas de usuario y acceso por organización: próximamente."
 
 #: templates/welcome.html:3
-#| msgid "Powerbuilder"
 msgid "Welcome: Powerbuilder"
 msgstr "Bienvenido: Powerbuilder"
 

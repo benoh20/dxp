@@ -13,7 +13,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: powerbuilder 0.1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-29 21:49-0400\n"
+"POT-Creation-Date: 2026-04-30 13:39-0400\n"
 "PO-Revision-Date: 2026-04-29 00:30-0400\n"
 "Last-Translator: Powerbuilder team (DRAFT, pending native review)\n"
 "Language-Team: Vietnamese <vi@li.org>\n"
@@ -222,6 +222,34 @@ msgstr "Xoá cuộc trò chuyện"
 msgid "No conversations yet"
 msgstr "Chưa có cuộc trò chuyện nào"
 
+#: templates/chat.html:1310 templates/chat.html:1311
+msgid "Theme"
+msgstr "Giao diện"
+
+#: templates/chat.html:1314
+msgid "Follow your device setting"
+msgstr "Theo cài đặt của thiết bị"
+
+#: templates/chat.html:1314
+msgid "System"
+msgstr "Hệ thống"
+
+#: templates/chat.html:1316
+msgid "Always light"
+msgstr "Luôn sáng"
+
+#: templates/chat.html:1316
+msgid "Light"
+msgstr "Sáng"
+
+#: templates/chat.html:1318
+msgid "Always dark"
+msgstr "Luôn tối"
+
+#: templates/chat.html:1318
+msgid "Dark"
+msgstr "Tối"
+
 #: templates/chat.html:1325
 msgid "Powered by OpenAI, Pinecone, Census API"
 msgstr "Được hỗ trợ bởi OpenAI, Pinecone, Census API"
@@ -271,7 +299,71 @@ msgstr "Gửi (Enter)"
 msgid "Send"
 msgstr "Gửi"
 
-#: templates/chat.html:1666
+#: templates/chat.html:1634
+msgid "A/B test toggle"
+msgstr "Bật thử nghiệm A/B"
+
+#: templates/chat.html:1635
+msgid "Generate two variants of every social messaging output"
+msgstr "Tạo hai phiên bản cho mỗi nội dung mạng xã hội"
+
+#: templates/chat.html:1637
+msgid "A/B test variants"
+msgstr "Phiên bản A/B"
+
+#: templates/chat.html:1640 templates/chat.html:1641
+msgid "Off (single variant per format)."
+msgstr "Tắt (một phiên bản cho mỗi định dạng)."
+
+#: templates/chat.html:1641
+msgid "On: two variants per social format + sample-size math."
+msgstr "Bật: hai phiên bản mỗi định dạng, kèm tính cỡ mẫu."
+
+#: templates/chat.html:1647
+msgid "Plan mode"
+msgstr "Chế độ kế hoạch"
+
+#: templates/chat.html:1648
+msgid "Mode"
+msgstr "Chế độ"
+
+#: templates/chat.html:1650
+msgid "Let Powerbuilder pick the natural mix"
+msgstr "Để Powerbuilder chọn cách phối hợp tự nhiên"
+
+#: templates/chat.html:1650
+msgid "Auto"
+msgstr "Tự động"
+
+#: templates/chat.html:1651
+msgid "GOTV: speak to supporters who already agree"
+msgstr "GOTV: nói chuyện với những người đã ủng hộ"
+
+#: templates/chat.html:1651
+msgid "Mobilization"
+msgstr "Huy động"
+
+#: templates/chat.html:1652
+msgid "Move undecided or soft-opposing voters"
+msgstr "Lay chuyển cử tri lưỡng lự hoặc chỉ phản đối nhẹ"
+
+#: templates/chat.html:1652
+msgid "Persuasion"
+msgstr "Thuyết phục"
+
+#: templates/chat.html:1655 templates/chat.html:1657
+msgid "Auto picks the mix."
+msgstr "Tự động chọn cách phối."
+
+#: templates/chat.html:1656
+msgid "GOTV your supporters."
+msgstr "GOTV nhóm ủng hộ."
+
+#: templates/chat.html:1657
+msgid "Move undecided voters."
+msgstr "Lay chuyển cử tri lưỡng lự."
+
+#: templates/chat.html:1671
 msgid ""
 "Powerbuilder analyzes your query using live Census, FEC, and election data."
 msgstr ""
@@ -300,7 +392,6 @@ msgid "User accounts and org-level login coming soon."
 msgstr "Tài khoản người dùng và đăng nhập cấp tổ chức sẽ sớm có."
 
 #: templates/welcome.html:3
-#| msgid "Powerbuilder"
 msgid "Welcome: Powerbuilder"
 msgstr "Chào mừng: Powerbuilder"
 

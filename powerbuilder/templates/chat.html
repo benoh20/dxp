@@ -1307,15 +1307,15 @@
     </div>
 
     <!-- Theme switcher (Milestone O) -->
-    <div class="theme-switcher" role="group" aria-label="Theme">
-      <span class="theme-switcher__label">Theme</span>
+    <div class="theme-switcher" role="group" aria-label="{% trans 'Theme' %}">
+      <span class="theme-switcher__label">{% trans "Theme" %}</span>
       <div class="theme-switcher__group" id="theme-switcher-group">
         <button type="button" class="theme-switcher__btn" data-theme-choice="system"
-                aria-pressed="true" title="Follow your device setting">System</button>
+                aria-pressed="true" title="{% trans 'Follow your device setting' %}">{% trans "System" %}</button>
         <button type="button" class="theme-switcher__btn" data-theme-choice="light"
-                aria-pressed="false" title="Always light">Light</button>
+                aria-pressed="false" title="{% trans 'Always light' %}">{% trans "Light" %}</button>
         <button type="button" class="theme-switcher__btn" data-theme-choice="dark"
-                aria-pressed="false" title="Always dark">Dark</button>
+                aria-pressed="false" title="{% trans 'Always dark' %}">{% trans "Dark" %}</button>
       </div>
     </div>
 
@@ -1631,25 +1631,30 @@
 
         <!-- Milestone K: A/B scaffolding toggle. Hidden input is the form's
              source of truth; the chip drives aria-pressed + value. -->
-        <div class="ab-toggle" aria-label="A/B test toggle">
-          <button type="button" class="ab-toggle__chip" id="ab-toggle-chip" aria-pressed="false" title="Generate two variants of every social messaging output">
+        <div class="ab-toggle" aria-label="{% trans 'A/B test toggle' %}">
+          <button type="button" class="ab-toggle__chip" id="ab-toggle-chip" aria-pressed="false" title="{% trans 'Generate two variants of every social messaging output' %}">
             <span class="ab-toggle__dot" aria-hidden="true"></span>
-            <span>A/B test variants</span>
+            <span>{% trans "A/B test variants" %}</span>
           </button>
-          <span class="ab-toggle__hint" id="ab-toggle-hint">Off (single variant per format).</span>
+          <span class="ab-toggle__hint" id="ab-toggle-hint"
+                data-i18n-off="{% trans 'Off (single variant per format).' %}"
+                data-i18n-on="{% trans 'On: two variants per social format + sample-size math.' %}">{% trans "Off (single variant per format)." %}</span>
           <input type="hidden" name="ab_test" id="ab-test-input" value="" form="chat-form">
         </div>
 
         <!-- Milestone L: plan-mode toggle. Hidden input is the source of truth
              for the form submission; buttons drive aria-pressed + value. -->
-        <div class="mode-toggle" role="group" aria-label="Plan mode">
-          <span class="mode-toggle__label">Mode</span>
+        <div class="mode-toggle" role="group" aria-label="{% trans 'Plan mode' %}">
+          <span class="mode-toggle__label">{% trans "Mode" %}</span>
           <div class="mode-toggle__group" id="mode-toggle-group">
-            <button type="button" class="mode-toggle__btn" data-mode="auto" aria-pressed="true" title="Let Powerbuilder pick the natural mix">Auto</button>
-            <button type="button" class="mode-toggle__btn" data-mode="mobilization" aria-pressed="false" title="GOTV: speak to supporters who already agree">Mobilization</button>
-            <button type="button" class="mode-toggle__btn" data-mode="persuasion" aria-pressed="false" title="Move undecided or soft-opposing voters">Persuasion</button>
+            <button type="button" class="mode-toggle__btn" data-mode="auto" aria-pressed="true" title="{% trans 'Let Powerbuilder pick the natural mix' %}">{% trans "Auto" %}</button>
+            <button type="button" class="mode-toggle__btn" data-mode="mobilization" aria-pressed="false" title="{% trans 'GOTV: speak to supporters who already agree' %}">{% trans "Mobilization" %}</button>
+            <button type="button" class="mode-toggle__btn" data-mode="persuasion" aria-pressed="false" title="{% trans 'Move undecided or soft-opposing voters' %}">{% trans "Persuasion" %}</button>
           </div>
-          <span class="mode-toggle__hint" id="mode-toggle-hint">Auto picks the mix.</span>
+          <span class="mode-toggle__hint" id="mode-toggle-hint"
+                data-i18n-auto="{% trans 'Auto picks the mix.' %}"
+                data-i18n-mobilization="{% trans 'GOTV your supporters.' %}"
+                data-i18n-persuasion="{% trans 'Move undecided voters.' %}">{% trans "Auto picks the mix." %}</span>
           <input type="hidden" name="plan_mode" id="plan-mode-input" value="auto" form="chat-form">
         </div>
 
@@ -1892,9 +1897,12 @@
       chip.setAttribute('aria-pressed', next ? 'true' : 'false');
       hidden.value = next ? '1' : '';
       if (hint) {
-        hint.textContent = next
-          ? 'On: two variants per social format + sample-size math.'
-          : 'Off (single variant per format).';
+        // Read translated strings from data-i18n-on / data-i18n-off so the
+        // hint follows the active locale instead of the hardcoded English
+        // these used to be.
+        const onText  = hint.getAttribute('data-i18n-on')  || 'On: two variants per social format + sample-size math.';
+        const offText = hint.getAttribute('data-i18n-off') || 'Off (single variant per format).';
+        hint.textContent = next ? onText : offText;
       }
     });
   })();
@@ -1913,11 +1921,15 @@
     const hint   = document.getElementById('mode-toggle-hint');
     if (!group || !hidden) return;
 
-    const HINTS = {
-      auto:         'Auto picks the mix.',
-      mobilization: 'GOTV your supporters.',
-      persuasion:   'Move undecided voters.'
-    };
+    /* Hint strings are translated server-side and stashed in data-i18n-*
+       attributes on the hint element so JS can swap them without hardcoding
+       English. Falls back to the hint's current text if a key is missing. */
+    function hintText(mode) {
+      if (!hint) return '';
+      const fromAttr = hint.getAttribute('data-i18n-' + mode);
+      if (fromAttr) return fromAttr;
+      return hint.getAttribute('data-i18n-auto') || hint.textContent || '';
+    }
 
     group.addEventListener('click', function (e) {
       const btn = e.target.closest('.mode-toggle__btn');
@@ -1929,7 +1941,7 @@
         b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
       });
       hidden.value = mode;
-      if (hint) hint.textContent = HINTS[mode] || HINTS.auto;
+      if (hint) hint.textContent = hintText(mode);
     });
   })();
 

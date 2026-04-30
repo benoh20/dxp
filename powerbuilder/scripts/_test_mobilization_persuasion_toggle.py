@@ -414,8 +414,12 @@ assert_('name="plan_mode"' in tpl_src,
         "hidden input must have name=plan_mode for the form POST")
 assert_('id="mode-toggle-group"' in tpl_src,
         "mode toggle group container missing")
+# Toggle labels are now wrapped in {% trans "..." %} so we accept either the
+# raw label or the translation tag form.
 for mode_label in ("Auto", "Mobilization", "Persuasion"):
-    assert_(f'>{mode_label}<' in tpl_src,
+    raw = f'>{mode_label}<'
+    trans_form = '{% trans "' + mode_label + '" %}'
+    assert_(raw in tpl_src or trans_form in tpl_src,
             f"toggle button {mode_label} missing from template")
 for mode_value in ("auto", "mobilization", "persuasion"):
     assert_(f'data-mode="{mode_value}"' in tpl_src,

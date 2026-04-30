@@ -564,6 +564,14 @@ _ERROR_PATTERNS = [
 ]
 
 
+# Generic fallback chip: shown when an agent error didn't match any specific
+# pattern. Loud enough to flag a real outage, useless when the answer renders
+# fine because some optional API key (Census, FEC) is missing on a preview
+# environment. We expose this string so the view layer can filter it out when
+# the deliverable looks complete.
+GENERIC_ERROR_FALLBACK = "An agent reported an issue, the response may be incomplete."
+
+
 def friendly_error(raw: str | None) -> str:
     """
     Map a raw agent-error string to a short, user-readable message.
@@ -586,21 +594,55 @@ def friendly_error(raw: str | None) -> str:
             return friendly
     # Fallback: keep it short and don't leak the raw string. Most users want to
     # know SOMETHING happened, not the full stacktrace.
-    return "An agent reported an issue, the response may be incomplete."
+    return GENERIC_ERROR_FALLBACK
 
 
-def sanitize_errors(errors: Iterable[str] | None) -> list[str]:
+# Heuristic: when the markdown answer renders to at least this many characters
+# of HTML the deliverable is "meaningful" and we can drop the generic-fallback
+# chip. Tuned so a one-line apology stays flagged but a real briefing (intro +
+# theory of change + at least one section) clears the bar.
+_MEANINGFUL_ANSWER_MIN_CHARS = 200
+
+
+def has_meaningful_answer(answer_html: str | None) -> bool:
+    """
+    True when ``answer_html`` looks like a real rendered response rather than
+    an empty / placeholder bubble. We measure raw length because the answer is
+    already markdown-rendered HTML by the time the view checks it; even a
+    short briefing easily clears 200 chars once headings + paragraph wrappers
+    are counted.
+    """
+    if not answer_html:
+        return False
+    return len(answer_html) >= _MEANINGFUL_ANSWER_MIN_CHARS
+
+
+def sanitize_errors(
+    errors: Iterable[str] | None,
+    *,
+    answer_html: str | None = None,
+) -> list[str]:
     """
     Return a list of friendly error messages, deduplicated, in original order.
     Empty / None input returns []. Empty individual entries are dropped.
+
+    When ``answer_html`` is provided AND looks like a meaningful deliverable
+    (see :func:`has_meaningful_answer`), the generic-fallback chip is dropped.
+    Specific chips (auth failures, rate limits, missing keys) still surface so
+    the operator knows when something genuinely degraded the answer. Callers
+    that don't pass ``answer_html`` get the legacy behaviour: every chip is
+    kept.
     """
     if not errors:
         return []
+    suppress_generic = answer_html is not None and has_meaningful_answer(answer_html)
     out: list[str] = []
     seen: set[str] = set()
     for raw in errors:
         msg = friendly_error(raw)
         if not msg or msg in seen:
+            continue
+        if suppress_generic and msg == GENERIC_ERROR_FALLBACK:
             continue
         seen.add(msg)
         out.append(msg)

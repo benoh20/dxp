@@ -285,10 +285,9 @@ def send_message_view(request):
     errors              = result.get("errors", [])
 
     # Milestone E: scrub raw agent-error lines the synthesizer sometimes echoes
-    # into the answer text, and convert the structured errors list into
-    # friendly user-facing messages.
+    # into the answer text. (Errors are sanitised AFTER markdown render below
+    # so we can suppress the generic-fallback chip when the answer looks fine.)
     final_answer = scrub_answer_text(final_answer)
-    errors       = sanitize_errors(errors)
 
     # Bubble id (Milestone D): used to namespace heading anchors so side-panel
     # nav links jump to the right bubble even when multiple plans share section
@@ -298,6 +297,12 @@ def send_message_view(request):
     # ── Markdown → HTML ───────────────────────────────────────────────────────
     answer_html = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)
     answer_html = prefix_heading_ids(answer_html, bubble_id)
+
+    # Now that we know what the rendered answer looks like, drop the generic
+    # "agent reported an issue" chip when the deliverable is meaningful. The
+    # specific chips (auth, rate-limit, quota) still surface so a real outage
+    # is never hidden.
+    errors = sanitize_errors(errors, answer_html=answer_html)
 
     # ── Source cards + plan-run flag (Milestone A: visible intelligence) ─────
     source_cards = extract_sources(result.get("research_results") or [])
@@ -538,11 +543,14 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     # Milestone E: same scrubbing as the HTMX path so SSE clients see the
     # friendly error chip and a clean answer rather than raw 401 dumps.
     final_answer = scrub_answer_text(final_answer)
-    errors       = sanitize_errors(errors)
 
     bubble_id = "b-" + uuid.uuid4().hex[:10]
     answer_html  = md_lib.markdown(final_answer, extensions=_MD_EXTENSIONS)
     answer_html  = prefix_heading_ids(answer_html, bubble_id)
+
+    # Suppress the generic-fallback chip when the rendered answer is meaningful
+    # (matches /send/ behaviour added with the chip-noise fix).
+    errors = sanitize_errors(errors, answer_html=answer_html)
     source_cards = extract_sources(result.get("research_results") or [])
     is_plan      = is_plan_run(active_agents)
     c3_footer    = c3_footer_text() if is_plan else None
@@ -631,6 +639,18 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     })
     request.session["conversations"] = conversations
     request.session.modified = True
+
+    # Streaming-response gotcha: SessionMiddleware.process_response runs BEFORE
+    # the StreamingHttpResponse generator yields, so by the time we mutate the
+    # session here it's too late to be auto-saved at the end of the request.
+    # Force an explicit save so SSE-completed turns persist into the sidebar
+    # history just like /send/ HTMX turns do.
+    try:
+        request.session.save()
+    except Exception:
+        # Never let a session-store hiccup crash the SSE done frame; the bubble
+        # was already rendered to the client.
+        logger.exception("Failed to save session on SSE done frame")
 
     return {
         "type":          "done",
