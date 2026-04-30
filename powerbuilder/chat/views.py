@@ -26,6 +26,7 @@ from django.conf import settings
 from django.http import Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from functools import wraps
 
@@ -101,10 +102,13 @@ def login_view(request):
         request.session["org_namespace"] = "general"
         return redirect("chat")
 
+    # Localize at request time (gettext, not gettext_lazy): LocaleMiddleware
+    # has already activated the right language for this request.
+    # House style: replace em dashes with colons.
     error = (
-        "Incorrect password."
+        _("Incorrect password.")
         if DEMO_PASSWORD
-        else "DEMO_PASSWORD is not configured — set it in your .env file."
+        else _("DEMO_PASSWORD is not configured: set it in your .env file.")
     )
     return render(request, "login.html", {"error": error})
 
