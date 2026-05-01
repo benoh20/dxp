@@ -40,11 +40,60 @@ Custom providers can be registered at runtime via register_custom_provider().
 ChangeAgent will use this hook without modifying this file.
 """
 
+import contextvars
 import os
+from contextlib import contextmanager
 from typing import Any, Callable, NamedTuple
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Milestone R: per-request provider override.
+#
+# The Django view sets this for the duration of one request via
+# ``provider_override(...)``; every ``get_completion_client()`` call inside
+# that request transparently uses the override instead of the env-default
+# LLM_PROVIDER. Thread-safe (ContextVar carries across threads via
+# copy_context, and Django's request thread sees its own value).
+#
+# Why a ContextVar instead of threading arg through every agent: agents
+# call ``get_completion_client()`` directly from many depths in the
+# LangGraph; refactoring every signature would be a much bigger change
+# than this milestone calls for. The override is opt-in (None = no
+# override) so the existing default path is byte-identical.
+_PROVIDER_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_PROVIDER_OVERRIDE", default=None,
+)
+
+
+@contextmanager
+def provider_override(provider: str | None):
+    """
+    Set the active LLM provider for the duration of a ``with`` block.
+
+    No-op when ``provider`` is None or empty (the env-default LLM_PROVIDER
+    stays in effect). Unknown provider names are accepted here without
+    validation — ``get_completion_client()`` is the single source of truth
+    for which providers are valid and will raise ValueError on an unknown
+    one. The view layer pre-validates user input via parse_provider().
+    """
+    if not provider:
+        yield
+        return
+    token = _PROVIDER_OVERRIDE.set(provider.lower().strip())
+    try:
+        yield
+    finally:
+        _PROVIDER_OVERRIDE.reset(token)
+
+
+def get_active_provider() -> str:
+    """
+    Return the provider name that ``get_completion_client()`` would use
+    right now — either the request-scoped override or the env default.
+    Used by the "Powered by" chip and the model_choices.jsonl logger.
+    """
+    return _PROVIDER_OVERRIDE.get() or LLM_PROVIDER
 
 # ---------------------------------------------------------------------------
 # Provider registry
@@ -184,7 +233,11 @@ def get_completion_client(
         ValueError:   Unknown provider name.
         RuntimeError: Required API key missing.
     """
-    active = (provider or LLM_PROVIDER).lower().strip()
+    # Milestone R: when the caller didn't pin a provider, honor the
+    # request-scoped override (set by the view via provider_override())
+    # before falling back to the env-default LLM_PROVIDER. This is what
+    # makes the input-bar picker work without touching every agent.
+    active = (provider or _PROVIDER_OVERRIDE.get() or LLM_PROVIDER).lower().strip()
 
     if active in _custom_registry:
         return _custom_registry[active]()

@@ -1019,6 +1019,64 @@
     margin-left: 0.15rem;
   }
 
+  /* Milestone R: LLM provider picker */
+  .provider-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .provider-picker__label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-right: 0.15rem;
+  }
+  .provider-picker__select {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 4px 24px 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4' stroke='%23999' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 10px;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .provider-picker__select:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .provider-picker__select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* Milestone R: "Powered by" chip on the response bubble. */
+  .powered-by-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 0.4rem;
+    margin-right: 0.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .powered-by-chip__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
   /* ── Empty state ────────────────────────────────────────────── */
   .empty-state {
     display: flex;
@@ -1658,6 +1716,23 @@
           <input type="hidden" name="plan_mode" id="plan-mode-input" value="auto" form="chat-form">
         </div>
 
+        <!-- Milestone R: LLM provider picker. Native <select> for keyboard +
+             screen-reader accessibility. The hidden input mirrors the select
+             value so both POST (htmx /send/) and GET (SSE /stream/) paths
+             read it the same way. Empty string = use server default; the
+             view's parse_provider() treats that as "no override". -->
+        <div class="provider-picker" aria-label="{% trans 'Model picker' %}">
+          <label class="provider-picker__label" for="llm-provider-select">{% trans "Model" %}</label>
+          <select id="llm-provider-select" class="provider-picker__select"
+                  title="{% trans 'Choose which LLM answers your question' %}">
+            <option value="">{% trans "Default" %} ({{ provider_default|title }})</option>
+            {% for key, name in provider_options %}
+            <option value="{{ key }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="llm_provider" id="llm-provider-input" value="" form="chat-form">
+        </div>
+
         {% if not DEMO_MODE %}
         <!-- File badge -->
         <div id="file-badge">
@@ -1875,7 +1950,7 @@
       return;
     }
 
-    startStream(query, getAbTest(), getPlanMode());
+    startStream(query, getAbTest(), getPlanMode(), getLlmProvider());
   });
 
   /* ── Milestone K: A/B test toggle wiring ──────────────────────────
@@ -1945,7 +2020,24 @@
     });
   })();
 
-  function startStream(query, abTest, planMode) {
+  /* Milestone R: provider-picker wiring. The native <select> is the visible
+     control; the hidden input is the source of truth for form submission.
+     getLlmProvider() returns the canonical lowercase key (or '' for default). */
+  function getLlmProvider() {
+    const el = document.getElementById('llm-provider-input');
+    return (el && el.value) ? el.value : '';
+  }
+
+  (function wireProviderPicker() {
+    const select = document.getElementById('llm-provider-select');
+    const hidden = document.getElementById('llm-provider-input');
+    if (!select || !hidden) return;
+    select.addEventListener('change', function () {
+      hidden.value = select.value || '';
+    });
+  })();
+
+  function startStream(query, abTest, planMode, llmProvider) {
     if (_activeStream) {
       try { _activeStream.close(); } catch (e) { /* noop */ }
       _activeStream = null;
@@ -1958,13 +2050,17 @@
 
     /* Milestone K: append ab_test to the SSE URL so the streaming pipeline
        sees the same flag the htmx /send/ path picks up via the hidden input.
-       Milestone L: same wiring for plan_mode. */
+       Milestone L: same wiring for plan_mode.
+       Milestone R: same wiring for llm_provider. */
     let url = '/stream/?query=' + encodeURIComponent(query);
     if (abTest) {
       url += '&ab_test=1';
     }
     if (planMode && planMode !== 'auto') {
       url += '&plan_mode=' + encodeURIComponent(planMode);
+    }
+    if (llmProvider) {
+      url += '&llm_provider=' + encodeURIComponent(llmProvider);
     }
     const es = new EventSource(url);
     _activeStream = es;

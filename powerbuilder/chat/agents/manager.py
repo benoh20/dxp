@@ -3,7 +3,7 @@ load_dotenv()
 
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from ..utils.llm_config import get_completion_client
+from ..utils.llm_config import get_completion_client, provider_override
 from ..progress import emit as _emit_progress
 
 from .researcher import research_node
@@ -505,6 +505,7 @@ def run_query(
     recursion_limit: int = 50,
     ab_test: bool = False,
     plan_mode: str | None = None,
+    llm_provider: str | None = None,
 ) -> dict:
     """
     Execute the Powerbuilder pipeline for a single user query.
@@ -541,12 +542,19 @@ def run_query(
     if uploaded_file_path:
         initial_state["uploaded_file_path"] = uploaded_file_path
 
-    result = manager_app.invoke(
-        initial_state,
-        config={"recursion_limit": recursion_limit},
-    )
+    # Milestone R: pin the chosen provider for the duration of this run.
+    # No-op when llm_provider is None (existing behavior preserved).
+    with provider_override(llm_provider):
+        result = manager_app.invoke(
+            initial_state,
+            config={"recursion_limit": recursion_limit},
+        )
     # Surface the namespace so callers can log/audit which org was served
     result["org_namespace"] = org_namespace
+    # Echo back the provider that actually answered so the view can render
+    # the "Powered by" chip without having to recompute. None means "env
+    # default was used" (which today is OpenAI gpt-4o).
+    result["llm_provider"] = llm_provider
     return result
 
 
@@ -563,6 +571,7 @@ def run_query_streaming(
     recursion_limit: int = 50,
     ab_test: bool = False,
     plan_mode: str | None = None,
+    llm_provider: str | None = None,
 ) -> dict:
     """
     Streaming variant of ``run_query``. Identical execution path, but the
@@ -587,9 +596,12 @@ def run_query_streaming(
     if uploaded_file_path:
         initial_state["uploaded_file_path"] = uploaded_file_path
 
-    result = manager_app.invoke(
-        initial_state,
-        config={"recursion_limit": recursion_limit},
-    )
+    # Milestone R: pin the chosen provider for the duration of this run.
+    with provider_override(llm_provider):
+        result = manager_app.invoke(
+            initial_state,
+            config={"recursion_limit": recursion_limit},
+        )
     result["org_namespace"] = org_namespace
+    result["llm_provider"] = llm_provider
     return result
