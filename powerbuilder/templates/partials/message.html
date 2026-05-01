@@ -1,3 +1,4 @@
+{% load i18n %}
 {% comment %}
 HTMX partial — assistant message bubble.
 Appended to #messages via hx-swap="beforeend" in chat.html, OR injected
@@ -14,6 +15,8 @@ Context variables:
     download_label       str|None — "Download Word Doc", "Download CSV", "Download Excel"
     errors               list — non-fatal pipeline error strings
     error                str|None — fatal error message (pipeline never ran)
+    provider_label       str|None — "OpenAI · gpt-4o" style label for the
+                                    "Powered by" chip (Milestone R)
 {% endcomment %}
 
 {% if error %}
@@ -104,6 +107,14 @@ Context variables:
       {% for agent in active_agents %}
       <span class="agent-pill">{{ agent|cut:"_"|title }}</span>
       {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Milestone R: "Powered by" chip. Surfaces which LLM provider answered.  #}
+    {% if provider_label %}
+    <div class="powered-by-chip" aria-label="{% trans 'LLM that answered this query' %}">
+      <span class="powered-by-chip__dot" aria-hidden="true"></span>
+      <span>{% blocktrans with model=provider_label %}Powered by {{ model }}{% endblocktrans %}</span>
     </div>
     {% endif %}
 

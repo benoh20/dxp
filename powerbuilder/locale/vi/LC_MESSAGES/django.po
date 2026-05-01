@@ -410,3 +410,29 @@ msgstr "Hãy giành chiến <span class=\"accent-W\">T</span>hắng này."
 #: templates/welcome.html:232
 msgid "Enter now"
 msgstr "Vào ngay"
+
+# ── Milestone R: model picker ──────────────────────────────────
+#: templates/chat.html:1666
+msgid "Model picker"
+msgstr "Bộ chọn mô hình"
+
+#: templates/chat.html:1667
+msgid "Model"
+msgstr "Mô hình"
+
+#: templates/chat.html:1669
+msgid "Choose which LLM answers your question"
+msgstr "Chọn LLM nào trả lời câu hỏi của bạn"
+
+#: templates/chat.html:1670
+msgid "Default"
+msgstr "Mặc định"
+
+#: templates/partials/message.html:112
+msgid "LLM that answered this query"
+msgstr "LLM đã trả lời truy vấn này"
+
+#: templates/partials/message.html:114
+#, python-format
+msgid "Powered by %(model)s"
+msgstr "Cung cấp bởi %(model)s"

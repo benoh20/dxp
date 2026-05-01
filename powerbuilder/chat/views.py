@@ -192,11 +192,25 @@ def chat_view(request):
     request.session["conversations"] = conversations
     request.session.modified = True
 
+    # Milestone R: provider picker options. Built from SUPPORTED_PROVIDERS so
+    # the dropdown automatically picks up any new providers Ben adds to the
+    # registry. Display names are friendly labels for the UI; the hidden
+    # input still posts back the canonical lowercase key.
+    from .utils.llm_config import SUPPORTED_PROVIDERS, LLM_PROVIDER
+    from .utils.provider_choice import PROVIDER_DISPLAY_NAMES
+    provider_options = [
+        (key, PROVIDER_DISPLAY_NAMES.get(key, key.title()))
+        for key in SUPPORTED_PROVIDERS
+    ]
+
     return render(request, "chat.html", {
         "conversations":    enriched,
         "current_messages": current_messages,
         "current_conv_id":  current_id,
         "demo_tiles":       get_demo_tiles(),  # Milestone G: configurable carousel
+        # Milestone R: data for the input-bar provider picker.
+        "provider_options":  provider_options,
+        "provider_default":  LLM_PROVIDER,
     })
 
 
@@ -234,6 +248,17 @@ def send_message_view(request):
     # Milestone L: optional plan-mode override from the input-bar toggle.
     # Manager will normalize unknown values to "auto".
     plan_mode = request.POST.get("plan_mode")
+    # Milestone R: optional LLM-provider override from the input-bar picker.
+    # parse_provider() returns None for empty / unknown values so the
+    # pipeline transparently falls back to the env-default provider.
+    from .utils.provider_choice import parse_provider, log_choice
+    llm_provider = parse_provider(request.POST.get("llm_provider"))
+    log_choice(
+        provider      = llm_provider,
+        query         = query,
+        org_namespace = request.session.get("org_namespace", "general"),
+        path          = "post",
+    )
 
     # ── File upload ──────────────────────────────────────────────────────────
     uploaded_file_path = None
@@ -272,6 +297,7 @@ def send_message_view(request):
             uploaded_file_path = uploaded_file_path,
             ab_test          = ab_test,
             plan_mode        = plan_mode,
+            llm_provider     = llm_provider,
         )
     except Exception as exc:
         logger.exception("Pipeline error: %s", exc)
@@ -390,6 +416,7 @@ def send_message_view(request):
     request.session["conversations"] = conversations
     request.session.modified = True
 
+    from .utils.provider_choice import provider_label as _provider_label
     return render(request, "partials/message.html", {
         "answer_html":         answer_html,
         "active_agents":       active_agents,
@@ -402,6 +429,8 @@ def send_message_view(request):
         "errors":              errors,
         "outline":             outline,
         "bubble_id":           bubble_id,
+        # Milestone R: "Powered by" chip on the response bubble.
+        "provider_label":      _provider_label(llm_provider),
     })
 
 
@@ -449,6 +478,15 @@ def stream_query_view(request):
     ab_test = ab_test_raw in ("1", "true", "yes", "on")
     # Milestone L: optional plan-mode override from the input-bar toggle.
     plan_mode = request.GET.get("plan_mode")
+    # Milestone R: optional LLM-provider override from the input-bar picker.
+    from .utils.provider_choice import parse_provider, log_choice
+    llm_provider = parse_provider(request.GET.get("llm_provider"))
+    log_choice(
+        provider      = llm_provider,
+        query         = query,
+        org_namespace = request.session.get("org_namespace", "general"),
+        path          = "stream",
+    )
 
     org_namespace = request.session.get("org_namespace", "general")
 
@@ -479,6 +517,7 @@ def stream_query_view(request):
                 uploaded_file_path = uploaded_file_path,
                 ab_test            = ab_test,
                 plan_mode          = plan_mode,
+                llm_provider       = llm_provider,
             )
         except Exception as exc:
             logger.exception("Streaming pipeline error: %s", exc)
@@ -586,6 +625,7 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
     # Plan outline for the side panel (Milestone D).
     outline = plan_outline(final_answer, active_agents, source_cards, downloads)
 
+    from .utils.provider_choice import provider_label as _provider_label
     bubble_html = render_to_string("partials/message.html", {
         "answer_html":         answer_html,
         "active_agents":       active_agents,
@@ -598,6 +638,8 @@ def _build_done_payload(request, query: str, result: dict) -> dict:
         "errors":              errors,
         "outline":             outline,
         "bubble_id":           bubble_id,
+        # Milestone R: "Powered by" chip on the response bubble.
+        "provider_label":      _provider_label(llm_provider),
     }, request=request)
 
     # Persist into the session so refreshes show the same history.

@@ -413,3 +413,29 @@ msgstr "Vamos por esta <span class=\"accent-W\">V</span>."
 #: templates/welcome.html:232
 msgid "Enter now"
 msgstr "Entrar ahora"
+
+# ── Milestone R: model picker ──────────────────────────────────
+#: templates/chat.html:1666
+msgid "Model picker"
+msgstr "Selector de modelo"
+
+#: templates/chat.html:1667
+msgid "Model"
+msgstr "Modelo"
+
+#: templates/chat.html:1669
+msgid "Choose which LLM answers your question"
+msgstr "Elige qué LLM responde a tu pregunta"
+
+#: templates/chat.html:1670
+msgid "Default"
+msgstr "Predeterminado"
+
+#: templates/partials/message.html:112
+msgid "LLM that answered this query"
+msgstr "LLM que respondió a esta consulta"
+
+#: templates/partials/message.html:114
+#, python-format
+msgid "Powered by %(model)s"
+msgstr "Con tecnología de %(model)s"
