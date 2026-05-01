@@ -4,11 +4,35 @@
 
 {% block head %}
 <style>
+  /* ── Mobile UX tokens (Milestone R.1) ───────────────────────── */
+  /* Single source of truth for tap-target sizing. WCAG 2.5.5      */
+  /* asks for at least 44x44 CSS px on touch devices; we use this  */
+  /* var on every interactive control instead of hand-tuning each  */
+  /* component, so a future change is one line.                    */
+  :root {
+    --tap-min: 44px;
+    /* env() is a CSS var that resolves to the device's safe inset  */
+    /* on iOS notch/home-indicator phones; 0 elsewhere. We expose   */
+    /* a fallback so the var is always defined.                     */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   /* ── Layout helpers ─────────────────────────────────────────── */
   .chat-root {
     display: flex;
     height: calc(100vh - 52px); /* subtract nav height */
     overflow: hidden;
+  }
+
+  /* When the mobile drawer is open, lock body scroll so a swipe   */
+  /* on the drawer does not bleed through to the page underneath.  */
+  /* The class is toggled by the drawer JS hook below.             */
+  body.drawer-open {
+    overflow: hidden;
+    /* iOS Safari quirk: position:fixed on body prevents elastic    */
+    /* rubber-band scrolling that overflow:hidden alone allows.     */
+    position: fixed;
+    width: 100%;
   }
 
   /* ── Sidebar ────────────────────────────────────────────────── */
@@ -847,7 +871,11 @@
   .input-bar {
     border-top: 1px solid var(--border);
     background: var(--bg-secondary);
-    padding: 0.875rem 1.25rem 0.75rem;
+    /* Bottom padding adds the device safe-area inset so the send  */
+    /* button never lands underneath an iOS home indicator. On     */
+    /* devices without an inset the var resolves to 0 and we get   */
+    /* the original 0.75rem.                                       */
+    padding: 0.875rem 1.25rem calc(0.75rem + var(--safe-bottom));
     flex-shrink: 0;
   }
   .input-inner {
@@ -875,7 +903,11 @@
     border-radius: 7px;
     display: flex;
     align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    /* Tap target floor; visual size stays controlled by padding.  */
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
     transition: color 0.12s, background 0.12s;
   }
   .input-icon-btn:hover { color: var(--text-secondary); background: var(--surface-overlay); }
@@ -1230,7 +1262,10 @@
     top: 60px;        /* below the 52px nav with a small gap */
     left: 10px;
     z-index: 30;
-    width: 36px; height: 36px;
+    /* Hamburger is a touch-first control; honor the tap-target    */
+    /* floor and enlarge slightly past the visual 36x36.           */
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
     border-radius: 8px;
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -2531,6 +2566,79 @@
       apply(choice);
     });
   })();
+
+  /* ============================================================
+     Mobile drawer hook (Milestone R.1)
+     Wires three accessibility behaviors onto the existing CSS-only
+     drawer (which is just a hidden checkbox + :checked transform):
+       1. Scroll lock   - body cannot scroll while drawer is open
+       2. Focus trap    - Tab is constrained to the drawer
+       3. Escape closes - keyboard parity with the scrim tap
+     The drawer itself is still pure CSS; this script is additive.
+     ============================================================ */
+  (function wireMobileDrawer() {
+    var toggle = document.getElementById('sidebar-toggle');
+    var sidebar = document.querySelector('.sidebar');
+    var hamburger = document.querySelector('.sidebar-hamburger');
+    if (!toggle || !sidebar || !hamburger) return;
+
+    /* Helper: only treat this as a mobile drawer when we are below the */
+    /* 768px breakpoint. On desktop the same checkbox is irrelevant     */
+    /* because the sidebar is a fixed left column, not a drawer.        */
+    function isMobile() {
+      return window.matchMedia('(max-width: 768px)').matches;
+    }
+
+    function focusableInsideDrawer() {
+      return sidebar.querySelectorAll(
+        'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+    }
+
+    function onKeydown(e) {
+      if (!toggle.checked || !isMobile()) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change'));
+        hamburger.focus();
+        return;
+      }
+      if (e.key === 'Tab') {
+        var els = focusableInsideDrawer();
+        if (!els.length) return;
+        var first = els[0];
+        var last = els[els.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    toggle.addEventListener('change', function () {
+      if (toggle.checked && isMobile()) {
+        document.body.classList.add('drawer-open');
+        /* Move focus into the drawer so screen reader + keyboard   */
+        /* users land where touch users land.                       */
+        var first = focusableInsideDrawer()[0];
+        if (first) first.focus();
+      } else {
+        document.body.classList.remove('drawer-open');
+      }
+    });
+
+    /* If the viewport grows past 768px while the drawer is open,      */
+    /* release the body lock; desktop layout takes over.               */
+    window.matchMedia('(max-width: 768px)').addEventListener('change', function (mql) {
+      if (!mql.matches) document.body.classList.remove('drawer-open');
+    });
+
+    document.addEventListener('keydown', onKeydown);
+  }());
 
   /* Scroll to bottom on initial load */
   scrollToBottom();
