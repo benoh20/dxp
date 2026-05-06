@@ -501,9 +501,14 @@ def election_results_node(state: AgentState) -> dict:
         if district_id == "statewide":
             master_df = raw_master[raw_master["district"] == "statewide"]
         else:
-            # Cast both sides to str: CSV may store district as integer (e.g. 5107)
-            # while district_id is always a string (e.g. "5107").
-            master_df = raw_master[raw_master["district"].astype(str) == str(district_id)]
+            # CSV may store the GEOID as an integer. States with a zero-padded FIPS
+            # (e.g. Arizona "04") lose the leading zero on load: "0406" → int 406 →
+            # str "406" ≠ "0406". Try both the padded form and the integer-string form.
+            district_str = str(district_id)
+            district_variants = {district_str}
+            if district_str.isdigit():
+                district_variants.add(str(int(district_str)))
+            master_df = raw_master[raw_master["district"].astype(str).isin(district_variants)]
 
         if master_df.empty:
             errors_out.append(

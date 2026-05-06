@@ -187,7 +187,7 @@ def _infer_power_type(query: str, active_agents: list | None = None) -> str:
 
 
 SYSTEM_PROMPT = (
-    "You are a senior organizer in the popular-education tradition (re:power, "
+    "You are a senior political director or organizer in the popular-education tradition (re:power, "
     "Wellstone, Ruckus Society, FWD.us Community Accelerator). You have received "
     "findings from specialist analysts. Synthesize them into a single clear "
     "non-repetitive professional briefing written in first person plural "
@@ -266,14 +266,37 @@ def _get_entry(structured_data: list, agent: str) -> Optional[dict]:
     return next((d for d in structured_data if d.get("agent") == agent), None)
 
 
+def _ordinal(n: int) -> str:
+    """Return the ordinal string for a positive integer (6 → '6th', 21 → '21st')."""
+    if 11 <= (n % 100) <= 13:
+        return f"{n}th"
+    return f"{n}" + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+
+
 def _district_label(structured_data: list) -> str:
-    """Build a human-readable district label from any agent's geographic context."""
+    """Build a human-readable district label from any agent's geographic context.
+
+    GEOID-format district IDs (four contiguous digits, e.g. '0406' or '5107')
+    are decoded as {state-fips-2}{district-num-2} and expanded to the full
+    state name and ordinal: '0406' → 'Arizona's 6th Congressional District'.
+    """
+    from .opposition_research import _FIPS_TO_STATE_ABBR, _STATE_ABBR_TO_NAME  # lazy to avoid circular
+
     for agent in ("precincts", "win_number", "finance"):
         entry = _get_entry(structured_data, agent)
         if entry and entry.get("district_type") and entry.get("district_id"):
             dt  = entry["district_type"].replace("_", " ").title()
             did = entry["district_id"]
-            return f"Statewide {dt}" if did == "statewide" else f"{dt} {did}"
+            if did == "statewide":
+                return f"Statewide {dt}"
+            # GEOID format: four digits encoding {state-fips-2}{district-num-2}
+            if re.match(r"^\d{4}$", did):
+                state_fips   = entry.get("state_fips") or did[:2]
+                district_num = int(did[2:])
+                abbr         = _FIPS_TO_STATE_ABBR.get(state_fips, "")
+                state_name   = _STATE_ABBR_TO_NAME.get(abbr, abbr) if abbr else state_fips
+                return f"{state_name} {_ordinal(district_num)} {dt} District"
+            return f"{dt} {did}"
     return "Target District"
 
 

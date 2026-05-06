@@ -131,9 +131,14 @@ class WinNumberAgent:
         if district_type == "senate":
             history = df[df["district"] == "statewide"]
         else:
-            # Cast both sides to str: the CSV may store district as an integer
-            # (e.g. 5107) while district_id is always a string (e.g. "5107").
-            history = df[df["district"].astype(str) == str(district_id)]
+            # CSV may store the GEOID as an integer. States with a zero-padded FIPS
+            # (e.g. Arizona "04") lose the leading zero on load: "0406" → int 406 →
+            # str "406" ≠ "0406". Try both the padded form and the integer-string form.
+            district_str = str(district_id)
+            district_variants = {district_str}
+            if district_str.isdigit():
+                district_variants.add(str(int(district_str)))
+            history = df[df["district"].astype(str).isin(district_variants)]
 
         if history.empty:
             return {
