@@ -30,6 +30,7 @@ openai>=1.12.0          # The core OpenAI library
 pydantic>=2.6.0         # For data validation in state.py
 pandas>=2.0.0           # For election data and precinct CSV processing
 requests>=2.31.0        # For Census and FEC API calls
+boto3>=1.20.0
 
 # Geospatial
 geopandas>=0.14.0       # Spatial joins and TIGER/Line shapefile loading

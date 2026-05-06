@@ -420,6 +420,110 @@ def _budget_tables(finance_entry: dict) -> tuple:
 # ---------------------------------------------------------------------------
 
 
+def _format_structured_for_prompt(structured_data: list) -> str:
+    """
+    Serialize structured_data into labeled, human-readable blocks for the LLM prompt.
+
+    Raw Python repr buries numeric values in dict syntax that LLMs regularly skip
+    over or paraphrase away. Explicit labeled fields with formatted values ensure the
+    synthesizer cites actual calculated figures (win number, turnout, budget) rather
+    than writing generic placeholder text about theory of change.
+    """
+    if not structured_data:
+        return "No structured data collected."
+
+    blocks: list[str] = []
+
+    win = _get_entry(structured_data, "win_number")
+    if win:
+        lines = [
+            "WIN NUMBER DATA — open the Win Number Calculation section with the exact "
+            "win number; cite all figures below in prose rather than writing generic text:",
+            f"  Win number (votes needed to win): {_fmt_int(win.get('win_number'))}",
+            f"  Projected turnout:                {_fmt_int(win.get('projected_turnout'))}",
+            f"  Voter universe (CVAP):            {_fmt_int(win.get('voter_universe_cvap'))}",
+            f"  Persuadable universe:             {_fmt_int(win.get('persuadable_universe'))}",
+            f"  Average historical turnout:       {_fmt_pct(win.get('avg_turnout_pct'))}",
+            f"  Victory margin target:            {_fmt_pct(win.get('victory_margin'))}",
+            f"  Historical context:               {win.get('historical_context', 'N/A')}",
+        ]
+        if win.get("data_notes"):
+            lines.append(f"  Data notes: {win['data_notes']}")
+        blocks.append("\n".join(lines))
+
+    finance = _get_entry(structured_data, "finance")
+    if finance:
+        tactic_labels = {
+            "door_knock": "Door knock", "phone_call": "Phone call",
+            "text_message": "Text message", "mail_piece": "Mail piece",
+            "digital": "Digital advertising",
+        }
+        lines = ["BUDGET DATA:"]
+        for tactic, cost in (finance.get("unit_costs") or {}).items():
+            try:
+                lines.append(f"  {tactic_labels.get(tactic, tactic)} unit cost: ${float(cost):.2f}")
+            except (TypeError, ValueError):
+                pass
+        bp = finance.get("budget_program")
+        if bp:
+            total_alloc = sum(d.get("budget_allocated", 0) for d in bp.values())
+            lines.append(f"  Total allocated budget: {_fmt_money(total_alloc)}")
+        full_est = finance.get("full_program_estimate") or {}
+        if full_est.get("total"):
+            lines.append(f"  Full program estimate (FEC average): {_fmt_money(full_est['total'])}")
+        blocks.append("\n".join(lines))
+
+    er = _get_entry(structured_data, "election_results")
+    if er:
+        lines = ["ELECTION RESULTS DATA:"]
+        if er.get("competitiveness"):
+            lines.append(f"  Competitiveness: {er['competitiveness']}")
+        if er.get("cook_pvi"):
+            lines.append(f"  Cook PVI: {er['cook_pvi']}")
+        mr = er.get("most_recent") or {}
+        if mr.get("year"):
+            lines.append(
+                f"  Most recent cycle ({mr['year']}): "
+                f"{_fmt_int(mr.get('totalvotes', 0))} total votes cast"
+            )
+            if mr.get("dem_pct") is not None:
+                m = mr["margin"]
+                party = "D" if m >= 0 else "R"
+                lines.append(
+                    f"  Vote share: D {mr['dem_pct'] * 100:.1f}% / "
+                    f"R {mr['rep_pct'] * 100:.1f}% ({party}+{abs(m) * 100:.1f}%)"
+                )
+        blocks.append("\n".join(lines))
+
+    precincts_entry = _get_entry(structured_data, "precincts")
+    if precincts_entry:
+        count = precincts_entry.get("precinct_count", 0)
+        precincts_list = precincts_entry.get("precincts") or []
+        lines = [f"PRECINCT DATA: {count} total precincts in crosswalk"]
+        if precincts_list:
+            top_names = [
+                p.get("precinct_name") or p.get("precinct_geoid", "")
+                for p in precincts_list[:5]
+            ]
+            lines.append(f"  Top 5 targets: {', '.join(top_names)}")
+        blocks.append("\n".join(lines))
+
+    # Pass through any unrecognised agent entries as flat key-value pairs so nothing
+    # is silently dropped when new agents are added.
+    known = {"win_number", "finance", "election_results", "precincts", "power_type"}
+    for entry in structured_data:
+        agent = entry.get("agent", "")
+        if agent not in known:
+            lines = [f"{agent.upper()} DATA:"]
+            for k, v in entry.items():
+                if k != "agent" and not isinstance(v, (list, dict)):
+                    lines.append(f"  {k}: {v}")
+            if len(lines) > 1:
+                blocks.append("\n".join(lines))
+
+    return "\n\n".join(blocks) if blocks else str(structured_data)
+
+
 _ATTRIBUTION = (
     "*Research sourced from American Bridge Research Books, Analyst Institute, "
     "CIRCLE, and Powerbuilder's curated research corpus.*"
@@ -429,13 +533,15 @@ _ATTRIBUTION = (
 def _build_prompt(
     query: str,
     research_context: str,
-    structured_context: str,
+    structured_data: list,
     active_agents: list,
     errors: list,
     is_plan: bool,
     district_label: str,
     power_type: str = "through",
 ) -> str:
+
+    structured_context = _format_structured_for_prompt(structured_data)
 
     error_block = ""
     if errors:
@@ -503,9 +609,12 @@ discuss what program it funds and what trade-offs were made. Do not reproduce ta
 they will be inserted after this section.
 
 ## Win Number Calculation
-Narrative interpretation of the win number: projected turnout, CVAP universe,
-historical turnout context, and what the number means for program scale.
-Do not reproduce raw numbers in a table — the win number table will be inserted here.
+Open with the exact win number from WIN NUMBER DATA above, e.g.
+'The win number for {district_label} is X,XXX votes.'
+Then interpret: what does the CVAP universe, historical turnout rate, and persuadable
+universe tell us about the path to victory? What program scale does reaching that
+number require? Cite the projected turnout and persuadable universe figures by name.
+Do not reproduce numbers in a table — the win number table will be inserted here.
 
 ## Program Recommendations
 3–5 concrete, prioritised action items for the campaign with rationale for each.
@@ -545,16 +654,15 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
     active_agents    = state.get("active_agents", [])
     errors           = state.get("errors", [])
 
-    research_ctx   = "\n\n".join(research_results) or "No research collected."
-    structured_ctx = str(structured_data) if structured_data else "No structured data collected."
-    district_lbl   = _district_label(structured_data)
+    research_ctx = "\n\n".join(research_results) or "No research collected."
+    district_lbl = _district_label(structured_data)
 
     power_type = _infer_power_type(state.get("query", ""), active_agents)
 
     prompt = _build_prompt(
         query=state.get("query", ""),
         research_context=research_ctx,
-        structured_context=structured_ctx,
+        structured_data=structured_data,
         active_agents=active_agents,
         errors=errors,
         is_plan=is_plan,
