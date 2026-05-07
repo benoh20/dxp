@@ -403,6 +403,24 @@ def intent_router_node(state: AgentState):
     ):
         decision = "RESEARCHER"
 
+    # Safety guard: never re-run researcher once it has already contributed.
+    # The LLM occasionally ignores the "do not repeat" instruction and loops
+    # back to RESEARCHER. For a plan run (any plan agent has already run),
+    # advance to the first unrun step in the canonical sequence. For a
+    # single-topic query where researcher was the only needed agent, finish.
+    if decision == "RESEARCHER" and "researcher" in active_agents:
+        _PLAN_SEQ = [
+            "election_results", "opposition_research", "win_number",
+            "precincts", "messaging", "cost_calculator",
+        ]
+        already_run = set(active_agents)
+        if already_run & set(_PLAN_SEQ):
+            decision = next(
+                (s for s in _PLAN_SEQ if s not in already_run), "FINISH"
+            )
+        else:
+            decision = "FINISH"
+
     formats = ["CSV", "MARKDOWN", "TEXT"]
     fmt = next((f for f in formats if f in response), "TEXT").lower()
 

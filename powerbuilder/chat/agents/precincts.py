@@ -454,6 +454,24 @@ class PrecinctsAgent:
             crosswalk["official_boundary"].astype(str).str.lower() == "true"
         )
 
+        # Build a precinct_geoid → human-readable name lookup before the groupby
+        # drops non-numeric columns. Prefer a dedicated TopoJSON-derived column
+        # ('name' or 'precinct') when the crosswalk builder included one; fall back
+        # to parsing the embedded name from the concatenated precinct_geoid string
+        # (format: "{id} {name}", e.g. "01001-10 JONES COMM_ CTR_").
+        _topo_name_col = next(
+            (c for c in ("name", "precinct") if c in crosswalk.columns), None
+        )
+        if _topo_name_col:
+            _precinct_name_map: dict = (
+                crosswalk[["precinct_geoid", _topo_name_col]]
+                .drop_duplicates("precinct_geoid")
+                .set_index("precinct_geoid")[_topo_name_col]
+                .to_dict()
+            )
+        else:
+            _precinct_name_map = {}
+
         # 5. Merge block group Census data with crosswalk
         # Core dasymetric logic — do not change
         merged = bg_df.merge(crosswalk, on="bg_geoid")
@@ -552,9 +570,17 @@ class PrecinctsAgent:
         # 8. Build standardised output schema
         results = []
         for _, row in top_targets.iterrows():
+            raw_geoid = row["precinct_geoid"]
+            precinct_id = raw_geoid.split(" ", 1)[0]
+            precinct_name = (
+                _precinct_name_map.get(raw_geoid)
+                or _precinct_name_map.get(precinct_id)
+                or PrecinctsAgent._parse_precinct_name(raw_geoid)
+            )
             record = {
-                "precinct_geoid": row["precinct_geoid"],
-                "precinct_name":  PrecinctsAgent._parse_precinct_name(row["precinct_geoid"]),
+                "precinct_geoid": raw_geoid,
+                "precinct_id":    precinct_id,
+                "precinct_name":  precinct_name,
             }
             # User-requested metrics (total_vap gets its own standardised key below)
             for metric in metrics:

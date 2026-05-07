@@ -358,7 +358,7 @@ def _precinct_table(precincts: list) -> tuple:
     """Build (headers, rows) from a list of precinct dicts."""
     if not precincts:
         return [], []
-    exclude = {"precinct_geoid", "approximate_boundary", "precinct_name"}
+    exclude = {"precinct_geoid", "precinct_id", "approximate_boundary", "precinct_name"}
     metric_keys = [k for k in precincts[0] if k not in exclude]
     headers = ["Precinct"] + [k.replace("_", " ").title() for k in metric_keys]
     rows = []
@@ -508,10 +508,11 @@ def _format_structured_for_prompt(structured_data: list) -> str:
         precincts_list = precincts_entry.get("precincts") or []
         lines = [f"PRECINCT DATA: {count} total precincts in crosswalk"]
         if precincts_list:
-            top_names = [
-                p.get("precinct_name") or p.get("precinct_geoid", "")
-                for p in precincts_list[:5]
-            ]
+            top_names = []
+            for p in precincts_list[:5]:
+                name = p.get("precinct_name", "")
+                pid  = p.get("precinct_id") or p.get("precinct_geoid", "").split(" ", 1)[0]
+                top_names.append(f"{name} ({pid})" if name else pid)
             lines.append(f"  Top 5 targets: {', '.join(top_names)}")
         blocks.append("\n".join(lines))
 
@@ -616,7 +617,25 @@ def _build_prompt(
         "Messaging recommendations must reference the other candidate or party by name; "
         "include at least one contrast angle per demographic segment grounded in the "
         "contrast research findings (do not invent contrast angles); and not be limited "
-        "to affirmative themes only."
+        "to affirmative themes only.\n\n"
+        "**Script and copy requirements when contrast research is present:** "
+        "Each of the four deliverables below must include at least one line that pairs "
+        "a documented weakness of the opposing candidate with our candidate's positive "
+        "record on that same issue, tailored to the demographics being targeted. "
+        "Draw only from findings already present in the CONTRAST RESEARCH DATA block — "
+        "do not invent or extrapolate beyond what is documented there. "
+        "For example, if the research documents the opponent's votes to cut Medicare, "
+        "the relevant script line should cite our candidate's specific record protecting "
+        "Medicare or expanding healthcare access — not a generic healthcare statement.\n"
+        "- **Canvassing script:** include a pivot line in the issue-discussion turn "
+        "(after the opener and before the ask) that names the contrast and invites the "
+        "voter to respond.\n"
+        "- **Phone banking script:** include one contrast sentence in the main pitch "
+        "paragraph, immediately before the call to action.\n"
+        "- **Text message templates:** one of the message variants must lead with or "
+        "reference the contrast angle (keep under 160 characters).\n"
+        "- **Digital ad copy:** the body copy of at least one ad unit must name the "
+        "opponent's documented position and contrast it with our candidate's record."
     ) if has_contrast_research else ""
 
     if is_plan:
