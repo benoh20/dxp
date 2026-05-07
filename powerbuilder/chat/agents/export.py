@@ -273,37 +273,52 @@ def _get_entry(structured_data: list, agent: str) -> Optional[dict]:
     return next((d for d in structured_data if d.get("agent") == agent), None)
 
 
-def _ordinal(n: int) -> str:
-    """Return the ordinal string for a positive integer (6 → '6th', 21 → '21st')."""
-    if 11 <= (n % 100) <= 13:
-        return f"{n}th"
-    return f"{n}" + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-
 
 def _district_label(structured_data: list) -> str:
     """Build a human-readable district label from any agent's geographic context.
 
-    GEOID-format district IDs (four contiguous digits, e.g. '0406' or '5107')
-    are decoded as {state-fips-2}{district-num-2} and expanded to the full
-    state name and ordinal: '0406' → 'Arizona's 6th Congressional District'.
+    GEOID-format district IDs are always converted to abbreviated form:
+      '0406' (congressional, state_fips='04') → 'AZ-06'
+      '5107' (congressional, state_fips='51') → 'VA-07'
+      '51S007' (state_senate)                 → 'VA-07'
+      '51H023' (state_house)                  → 'VA-23'
+    Raw GEOIDs are never surfaced to the caller.
     """
-    from .opposition_research import _FIPS_TO_STATE_ABBR, _STATE_ABBR_TO_NAME  # lazy to avoid circular
+    from .opposition_research import _FIPS_TO_STATE_ABBR  # lazy to avoid circular
 
-    for agent in ("precincts", "win_number", "finance"):
+    for agent in ("precincts", "win_number", "election_results"):
         entry = _get_entry(structured_data, agent)
-        if entry and entry.get("district_type") and entry.get("district_id"):
-            dt  = entry["district_type"].replace("_", " ").title()
-            did = entry["district_id"]
-            if did == "statewide":
-                return f"Statewide {dt}"
-            # GEOID format: four digits encoding {state-fips-2}{district-num-2}
-            if re.match(r"^\d{4}$", did):
-                state_fips   = entry.get("state_fips") or did[:2]
-                district_num = int(did[2:])
-                abbr         = _FIPS_TO_STATE_ABBR.get(state_fips, "")
-                state_name   = _STATE_ABBR_TO_NAME.get(abbr, abbr) if abbr else state_fips
-                return f"{state_name} {_ordinal(district_num)} {dt} District"
+        if not (entry and entry.get("district_type") and entry.get("district_id")):
+            continue
+        dt  = entry["district_type"].replace("_", " ").title()
+        did = entry["district_id"]
+        sf  = entry.get("state_fips", "")
+        abbr = _FIPS_TO_STATE_ABBR.get(sf, "")
+
+        if did == "statewide":
+            return f"Statewide {dt}"
+
+        # All-digit GEOID: {state_fips_2}{district_num} — e.g. '0406', '51007'
+        if re.match(r"^\d{4,5}$", did):
+            prefix = len(sf) if sf and did.startswith(sf) else 2
+            district_num = int(did[prefix:])
+            return f"{abbr}-{district_num:02d}" if abbr else f"{district_num:02d}"
+
+        # State-legislative GEOID with letter prefix: '51S007', '51H023'
+        m = re.match(r"^(\d{2})[SsHh](\d+)$", did)
+        if m:
+            if not abbr:
+                abbr = _FIPS_TO_STATE_ABBR.get(m.group(1), "")
+            district_num = int(m.group(2))
+            return f"{abbr}-{district_num:02d}" if abbr else f"{district_num:02d}"
+
+        # Non-GEOID IDs (e.g. already-readable strings): return as-is without raw digits
+        if not re.search(r"\d{4,}", did):
             return f"{dt} {did}"
+        # Last resort: strip the state FIPS prefix if present and format cleanly
+        stripped = did[len(sf):].lstrip("0") if sf and did.startswith(sf) else did
+        return f"{abbr}-{stripped.zfill(2)}" if abbr else stripped or did
+
     return "Target District"
 
 

@@ -1,6 +1,7 @@
 # powerbuilder/chat/agents/precincts.py
 import logging
 import os
+import re
 from typing import List
 
 from dotenv import load_dotenv
@@ -111,6 +112,311 @@ _DEMOGRAPHIC_PROFILES: dict[str, str] = {
     ),
 }
 
+# ---------------------------------------------------------------------------
+# County FIPS → county name lookup for all counties in crosswalk-covered states.
+# Keys are 5-digit strings (state_fips_2 + county_fips_3), e.g. "04013" = Maricopa, AZ.
+# Virginia independent cities are stored with " City" suffix so _format_precinct_label
+# can omit the "Co." abbreviation for those entries.
+# ---------------------------------------------------------------------------
+_COUNTY_NAMES: dict[str, str] = {
+    # === Arizona (04) — 15 counties ===
+    "04001": "Apache",      "04003": "Cochise",     "04005": "Coconino",
+    "04007": "Gila",        "04009": "Graham",      "04011": "Greenlee",
+    "04012": "La Paz",      "04013": "Maricopa",    "04015": "Mohave",
+    "04017": "Navajo",      "04019": "Pima",        "04021": "Pinal",
+    "04023": "Santa Cruz",  "04025": "Yavapai",     "04027": "Yuma",
+
+    # === Nevada (32) — 16 counties + 1 independent city ===
+    "32001": "Churchill",   "32003": "Clark",       "32005": "Douglas",
+    "32007": "Elko",        "32009": "Esmeralda",   "32011": "Eureka",
+    "32013": "Humboldt",    "32015": "Lander",      "32017": "Lincoln",
+    "32019": "Lyon",        "32021": "Mineral",     "32023": "Nye",
+    "32027": "Pershing",    "32029": "Storey",      "32031": "Washoe",
+    "32033": "White Pine",  "32510": "Carson City",
+
+    # === Michigan (26) — 83 counties ===
+    "26001": "Alcona",      "26003": "Alger",       "26005": "Allegan",
+    "26007": "Alpena",      "26009": "Antrim",      "26011": "Arenac",
+    "26013": "Baraga",      "26015": "Barry",       "26017": "Bay",
+    "26019": "Benzie",      "26021": "Berrien",     "26023": "Branch",
+    "26025": "Calhoun",     "26027": "Cass",        "26029": "Charlevoix",
+    "26031": "Cheboygan",   "26033": "Chippewa",    "26035": "Clare",
+    "26037": "Clinton",     "26039": "Crawford",    "26041": "Delta",
+    "26043": "Dickinson",   "26045": "Eaton",       "26047": "Emmet",
+    "26049": "Genesee",     "26051": "Gladwin",     "26053": "Gogebic",
+    "26055": "Grand Traverse", "26057": "Gratiot",  "26059": "Hillsdale",
+    "26061": "Houghton",    "26063": "Huron",       "26065": "Ingham",
+    "26067": "Ionia",       "26069": "Iosco",       "26071": "Iron",
+    "26073": "Isabella",    "26075": "Jackson",     "26077": "Kalamazoo",
+    "26079": "Kalkaska",    "26081": "Kent",        "26083": "Keweenaw",
+    "26085": "Lake",        "26087": "Lapeer",      "26089": "Leelanau",
+    "26091": "Lenawee",     "26093": "Livingston",  "26095": "Luce",
+    "26097": "Mackinac",    "26099": "Macomb",      "26101": "Manistee",
+    "26103": "Marquette",   "26105": "Mason",       "26107": "Mecosta",
+    "26109": "Menominee",   "26111": "Midland",     "26113": "Missaukee",
+    "26115": "Monroe",      "26117": "Montcalm",    "26119": "Montmorency",
+    "26121": "Muskegon",    "26123": "Newaygo",     "26125": "Oakland",
+    "26127": "Oceana",      "26129": "Ogemaw",      "26131": "Ontonagon",
+    "26133": "Osceola",     "26135": "Oscoda",      "26137": "Otsego",
+    "26139": "Ottawa",      "26141": "Presque Isle", "26143": "Roscommon",
+    "26145": "Saginaw",     "26147": "St. Clair",   "26149": "St. Joseph",
+    "26151": "Sanilac",     "26153": "Schoolcraft", "26155": "Shiawassee",
+    "26157": "Tuscola",     "26159": "Van Buren",   "26161": "Washtenaw",
+    "26163": "Wayne",       "26165": "Wexford",
+
+    # === Ohio (39) — 88 counties ===
+    "39001": "Adams",       "39003": "Allen",       "39005": "Ashland",
+    "39007": "Ashtabula",   "39009": "Athens",      "39011": "Auglaize",
+    "39013": "Belmont",     "39015": "Brown",       "39017": "Butler",
+    "39019": "Carroll",     "39021": "Champaign",   "39023": "Clark",
+    "39025": "Clermont",    "39027": "Clinton",     "39029": "Columbiana",
+    "39031": "Coshocton",   "39033": "Crawford",    "39035": "Cuyahoga",
+    "39037": "Darke",       "39039": "Defiance",    "39041": "Delaware",
+    "39043": "Erie",        "39045": "Fairfield",   "39047": "Fayette",
+    "39049": "Franklin",    "39051": "Fulton",      "39053": "Gallia",
+    "39055": "Geauga",      "39057": "Greene",      "39059": "Guernsey",
+    "39061": "Hamilton",    "39063": "Hancock",     "39065": "Hardin",
+    "39067": "Harrison",    "39069": "Henry",       "39071": "Highland",
+    "39073": "Hocking",     "39075": "Holmes",      "39077": "Huron",
+    "39079": "Jackson",     "39081": "Jefferson",   "39083": "Knox",
+    "39085": "Lake",        "39087": "Lawrence",    "39089": "Licking",
+    "39091": "Logan",       "39093": "Lorain",      "39095": "Lucas",
+    "39097": "Madison",     "39099": "Mahoning",    "39101": "Marion",
+    "39103": "Medina",      "39105": "Meigs",       "39107": "Mercer",
+    "39109": "Miami",       "39111": "Monroe",      "39113": "Montgomery",
+    "39115": "Morgan",      "39117": "Morrow",      "39119": "Muskingum",
+    "39121": "Noble",       "39123": "Ottawa",      "39125": "Paulding",
+    "39127": "Perry",       "39129": "Pickaway",    "39131": "Pike",
+    "39133": "Portage",     "39135": "Preble",      "39137": "Putnam",
+    "39139": "Richland",    "39141": "Ross",        "39143": "Sandusky",
+    "39145": "Scioto",      "39147": "Seneca",      "39149": "Shelby",
+    "39151": "Stark",       "39153": "Summit",      "39155": "Trumbull",
+    "39157": "Tuscarawas",  "39159": "Union",       "39161": "Van Wert",
+    "39163": "Vinton",      "39165": "Warren",      "39167": "Washington",
+    "39169": "Wayne",       "39171": "Williams",    "39173": "Wood",
+    "39175": "Wyandot",
+
+    # === New Hampshire (33) — 10 counties ===
+    "33001": "Belknap",     "33003": "Carroll",     "33005": "Cheshire",
+    "33007": "Coos",        "33009": "Grafton",     "33011": "Hillsborough",
+    "33013": "Merrimack",   "33015": "Rockingham",  "33017": "Strafford",
+    "33019": "Sullivan",
+
+    # === Pennsylvania (42) — 67 counties ===
+    "42001": "Adams",       "42003": "Allegheny",   "42005": "Armstrong",
+    "42007": "Beaver",      "42009": "Bedford",     "42011": "Berks",
+    "42013": "Blair",       "42015": "Bradford",    "42017": "Bucks",
+    "42019": "Butler",      "42021": "Cambria",     "42023": "Cameron",
+    "42025": "Carbon",      "42027": "Centre",      "42029": "Chester",
+    "42031": "Clarion",     "42033": "Clearfield",  "42035": "Clinton",
+    "42037": "Columbia",    "42039": "Crawford",    "42041": "Cumberland",
+    "42043": "Dauphin",     "42045": "Delaware",    "42047": "Elk",
+    "42049": "Erie",        "42051": "Fayette",     "42053": "Forest",
+    "42055": "Franklin",    "42057": "Fulton",      "42059": "Greene",
+    "42061": "Huntingdon",  "42063": "Indiana",     "42065": "Jefferson",
+    "42067": "Juniata",     "42069": "Lackawanna",  "42071": "Lancaster",
+    "42073": "Lawrence",    "42075": "Lebanon",     "42077": "Lehigh",
+    "42079": "Luzerne",     "42081": "Lycoming",    "42083": "McKean",
+    "42085": "Mercer",      "42087": "Mifflin",     "42089": "Monroe",
+    "42091": "Montgomery",  "42093": "Montour",     "42095": "Northampton",
+    "42097": "Northumberland", "42099": "Perry",    "42101": "Philadelphia",
+    "42103": "Pike",        "42105": "Potter",      "42107": "Schuylkill",
+    "42109": "Snyder",      "42111": "Somerset",    "42113": "Sullivan",
+    "42115": "Susquehanna", "42117": "Tioga",       "42119": "Union",
+    "42121": "Venango",     "42123": "Warren",      "42125": "Washington",
+    "42127": "Wayne",       "42129": "Westmoreland", "42131": "Wyoming",
+    "42133": "York",
+
+    # === Colorado (08) — 64 counties ===
+    "08001": "Adams",       "08003": "Alamosa",     "08005": "Arapahoe",
+    "08007": "Archuleta",   "08009": "Baca",        "08011": "Bent",
+    "08013": "Boulder",     "08014": "Broomfield",  "08015": "Chaffee",
+    "08017": "Cheyenne",    "08019": "Clear Creek",  "08021": "Conejos",
+    "08023": "Costilla",    "08025": "Crowley",     "08027": "Custer",
+    "08029": "Delta",       "08031": "Denver",      "08033": "Dolores",
+    "08035": "Douglas",     "08037": "Eagle",       "08039": "Elbert",
+    "08041": "El Paso",     "08043": "Fremont",     "08045": "Garfield",
+    "08047": "Gilpin",      "08049": "Grand",       "08051": "Gunnison",
+    "08053": "Hinsdale",    "08055": "Huerfano",    "08057": "Jackson",
+    "08059": "Jefferson",   "08061": "Kiowa",       "08063": "Kit Carson",
+    "08065": "Lake",        "08067": "La Plata",    "08069": "Larimer",
+    "08071": "Las Animas",  "08073": "Lincoln",     "08075": "Logan",
+    "08077": "Mesa",        "08079": "Mineral",     "08081": "Moffat",
+    "08083": "Montezuma",   "08085": "Montrose",    "08087": "Morgan",
+    "08089": "Otero",       "08091": "Ouray",       "08093": "Park",
+    "08095": "Phillips",    "08097": "Pitkin",      "08099": "Prowers",
+    "08101": "Pueblo",      "08103": "Rio Blanco",  "08105": "Rio Grande",
+    "08107": "Routt",       "08109": "Saguache",    "08111": "San Juan",
+    "08113": "San Miguel",  "08115": "Sedgwick",    "08117": "Summit",
+    "08119": "Teller",      "08121": "Washington",  "08123": "Weld",
+    "08125": "Yuma",
+
+    # === Wisconsin (55) — 72 counties ===
+    "55001": "Adams",       "55003": "Ashland",     "55005": "Barron",
+    "55007": "Bayfield",    "55009": "Brown",       "55011": "Buffalo",
+    "55013": "Burnett",     "55015": "Calumet",     "55017": "Chippewa",
+    "55019": "Clark",       "55021": "Columbia",    "55023": "Crawford",
+    "55025": "Dane",        "55027": "Dodge",       "55029": "Door",
+    "55031": "Douglas",     "55033": "Dunn",        "55035": "Eau Claire",
+    "55037": "Florence",    "55039": "Fond du Lac", "55041": "Forest",
+    "55043": "Grant",       "55045": "Green",       "55047": "Green Lake",
+    "55049": "Iowa",        "55051": "Iron",        "55053": "Jackson",
+    "55055": "Jefferson",   "55057": "Juneau",      "55059": "Kenosha",
+    "55061": "Kewaunee",    "55063": "La Crosse",   "55065": "Lafayette",
+    "55067": "Langlade",    "55069": "Lincoln",     "55071": "Manitowoc",
+    "55073": "Marathon",    "55075": "Marinette",   "55077": "Marquette",
+    "55078": "Menominee",   "55079": "Milwaukee",   "55081": "Monroe",
+    "55083": "Oconto",      "55085": "Oneida",      "55087": "Outagamie",
+    "55089": "Ozaukee",     "55091": "Pepin",       "55093": "Pierce",
+    "55095": "Polk",        "55097": "Portage",     "55099": "Price",
+    "55101": "Racine",      "55103": "Richland",    "55105": "Rock",
+    "55107": "Rusk",        "55109": "St. Croix",   "55111": "Sauk",
+    "55113": "Sawyer",      "55115": "Shawano",     "55117": "Sheboygan",
+    "55119": "Taylor",      "55121": "Trempealeau", "55123": "Vernon",
+    "55125": "Vilas",       "55127": "Walworth",    "55129": "Washburn",
+    "55131": "Washington",  "55133": "Waukesha",    "55135": "Waupaca",
+    "55137": "Waushara",    "55139": "Winnebago",   "55141": "Wood",
+
+    # === Virginia (51) — 95 counties + 39 independent cities ===
+    # Counties
+    "51001": "Accomack",    "51003": "Albemarle",   "51005": "Alleghany",
+    "51007": "Amelia",      "51009": "Amherst",     "51011": "Appomattox",
+    "51013": "Arlington",   "51015": "Augusta",     "51017": "Bath",
+    "51019": "Bedford",     "51021": "Bland",       "51023": "Botetourt",
+    "51025": "Brunswick",   "51027": "Buchanan",    "51029": "Buckingham",
+    "51031": "Campbell",    "51033": "Caroline",    "51035": "Carroll",
+    "51037": "Charles City", "51039": "Charlotte",  "51041": "Chesterfield",
+    "51043": "Clarke",      "51045": "Craig",       "51047": "Culpeper",
+    "51049": "Cumberland",  "51051": "Dickenson",   "51053": "Dinwiddie",
+    "51057": "Essex",       "51059": "Fairfax",     "51061": "Fauquier",
+    "51063": "Floyd",       "51065": "Fluvanna",    "51067": "Franklin",
+    "51069": "Frederick",   "51071": "Giles",       "51073": "Gloucester",
+    "51075": "Goochland",   "51077": "Grayson",     "51079": "Greene",
+    "51081": "Greensville", "51083": "Halifax",     "51085": "Hanover",
+    "51087": "Henrico",     "51089": "Henry",       "51091": "Highland",
+    "51093": "Isle of Wight", "51095": "James City", "51097": "King and Queen",
+    "51099": "King George", "51101": "King William", "51103": "Lancaster",
+    "51105": "Lee",         "51107": "Loudoun",     "51109": "Louisa",
+    "51111": "Lunenburg",   "51113": "Madison",     "51115": "Mathews",
+    "51117": "Mecklenburg", "51119": "Middlesex",   "51121": "Montgomery",
+    "51125": "Nelson",      "51127": "New Kent",    "51131": "Northampton",
+    "51133": "Northumberland", "51135": "Nottoway", "51137": "Orange",
+    "51139": "Page",        "51141": "Patrick",     "51143": "Pittsylvania",
+    "51145": "Powhatan",    "51147": "Prince Edward", "51149": "Prince George",
+    "51153": "Prince William", "51155": "Pulaski",  "51157": "Rappahannock",
+    "51159": "Richmond",    "51161": "Roanoke",     "51163": "Rockbridge",
+    "51165": "Rockingham",  "51167": "Russell",     "51169": "Scott",
+    "51171": "Shenandoah",  "51173": "Smyth",       "51175": "Southampton",
+    "51177": "Spotsylvania", "51179": "Stafford",   "51181": "Surry",
+    "51183": "Sussex",      "51185": "Tazewell",    "51187": "Warren",
+    "51191": "Washington",  "51193": "Westmoreland", "51195": "Wise",
+    "51197": "Wythe",       "51199": "York",
+    # Independent cities (suffix " City" triggers omission of "Co." in label)
+    "51510": "Alexandria City",      "51515": "Bedford City",
+    "51520": "Bristol City",         "51530": "Buena Vista City",
+    "51540": "Charlottesville City", "51550": "Chesapeake City",
+    "51560": "Colonial Heights City", "51570": "Covington City",
+    "51580": "Danville City",        "51590": "Emporia City",
+    "51595": "Fairfax City",         "51600": "Falls Church City",
+    "51610": "Franklin City",        "51620": "Fredericksburg City",
+    "51630": "Galax City",           "51640": "Hampton City",
+    "51650": "Harrisonburg City",    "51660": "Hopewell City",
+    "51670": "Lexington City",       "51678": "Lynchburg City",
+    "51683": "Manassas City",        "51685": "Manassas Park City",
+    "51690": "Martinsville City",    "51700": "Newport News City",
+    "51710": "Norfolk City",         "51720": "Norton City",
+    "51730": "Petersburg City",      "51735": "Poquoson City",
+    "51740": "Portsmouth City",      "51750": "Radford City",
+    "51760": "Richmond City",        "51770": "Roanoke City",
+    "51775": "Salem City",           "51790": "Staunton City",
+    "51800": "Suffolk City",         "51810": "Virginia Beach City",
+    "51820": "Waynesboro City",      "51830": "Williamsburg City",
+    "51840": "Winchester City",
+
+    # === Rhode Island (44) — 5 counties ===
+    "44001": "Bristol",     "44003": "Kent",        "44005": "Newport",
+    "44007": "Providence",  "44009": "Washington",
+
+    # === Georgia (13) — 159 counties ===
+    "13001": "Appling",     "13003": "Atkinson",    "13005": "Bacon",
+    "13007": "Baker",       "13009": "Baldwin",     "13011": "Banks",
+    "13013": "Barrow",      "13015": "Bartow",      "13017": "Ben Hill",
+    "13019": "Berrien",     "13021": "Bibb",        "13023": "Bleckley",
+    "13025": "Brantley",    "13027": "Brooks",      "13029": "Bryan",
+    "13031": "Bulloch",     "13033": "Burke",       "13035": "Butts",
+    "13037": "Calhoun",     "13039": "Camden",      "13043": "Candler",
+    "13045": "Carroll",     "13047": "Catoosa",     "13049": "Charlton",
+    "13051": "Chatham",     "13053": "Chattahoochee", "13055": "Chattooga",
+    "13057": "Cherokee",    "13059": "Clarke",      "13061": "Clay",
+    "13063": "Clayton",     "13065": "Clinch",      "13067": "Cobb",
+    "13069": "Coffee",      "13071": "Colquitt",    "13073": "Columbia",
+    "13075": "Cook",        "13077": "Coweta",      "13079": "Crawford",
+    "13081": "Crisp",       "13083": "Dade",        "13085": "Dawson",
+    "13087": "Decatur",     "13089": "DeKalb",      "13091": "Dodge",
+    "13093": "Dooly",       "13095": "Dougherty",   "13097": "Douglas",
+    "13099": "Early",       "13101": "Echols",      "13103": "Effingham",
+    "13105": "Elbert",      "13107": "Emanuel",     "13109": "Evans",
+    "13111": "Fannin",      "13113": "Fayette",     "13115": "Floyd",
+    "13117": "Forsyth",     "13119": "Franklin",    "13121": "Fulton",
+    "13123": "Gilmer",      "13125": "Glascock",    "13127": "Glynn",
+    "13129": "Gordon",      "13131": "Grady",       "13133": "Greene",
+    "13135": "Gwinnett",    "13137": "Habersham",   "13139": "Hall",
+    "13141": "Hancock",     "13143": "Haralson",    "13145": "Harris",
+    "13147": "Hart",        "13149": "Heard",       "13151": "Henry",
+    "13153": "Houston",     "13155": "Irwin",       "13157": "Jackson",
+    "13159": "Jasper",      "13161": "Jeff Davis",  "13163": "Jefferson",
+    "13165": "Jenkins",     "13167": "Johnson",     "13169": "Jones",
+    "13171": "Lamar",       "13173": "Lanier",      "13175": "Laurens",
+    "13177": "Lee",         "13179": "Liberty",     "13181": "Lincoln",
+    "13183": "Long",        "13185": "Lowndes",     "13187": "Lumpkin",
+    "13189": "McDuffie",    "13191": "McIntosh",    "13193": "Macon",
+    "13195": "Madison",     "13197": "Marion",      "13199": "Meriwether",
+    "13201": "Miller",      "13205": "Mitchell",    "13207": "Monroe",
+    "13209": "Montgomery",  "13211": "Morgan",      "13213": "Murray",
+    "13215": "Muscogee",    "13217": "Newton",      "13219": "Oconee",
+    "13221": "Oglethorpe",  "13223": "Paulding",    "13225": "Peach",
+    "13227": "Pickens",     "13229": "Pierce",      "13231": "Pike",
+    "13233": "Polk",        "13235": "Pulaski",     "13237": "Putnam",
+    "13239": "Quitman",     "13241": "Rabun",       "13243": "Randolph",
+    "13245": "Richmond",    "13247": "Rockdale",    "13249": "Schley",
+    "13251": "Screven",     "13253": "Seminole",    "13255": "Spalding",
+    "13257": "Stephens",    "13259": "Stewart",     "13261": "Sumter",
+    "13263": "Talbot",      "13265": "Taliaferro",  "13267": "Tattnall",
+    "13269": "Taylor",      "13271": "Telfair",     "13273": "Terrell",
+    "13275": "Thomas",      "13277": "Tift",        "13279": "Toombs",
+    "13281": "Towns",       "13283": "Treutlen",    "13285": "Troup",
+    "13287": "Turner",      "13289": "Twiggs",      "13291": "Union",
+    "13293": "Upson",       "13295": "Walker",      "13297": "Walton",
+    "13299": "Ware",        "13301": "Warren",      "13303": "Washington",
+    "13305": "Wayne",       "13307": "Webster",     "13309": "Wheeler",
+    "13311": "White",       "13313": "Whitfield",   "13315": "Wilcox",
+    "13317": "Wilkes",      "13319": "Wilkinson",   "13321": "Worth",
+}
+
+
+def _format_precinct_label(precinct_id: str) -> str:
+    """Convert a bare precinct GEOID to a human-readable label.
+
+    Expected format: '{state_fips_2}{county_fips_3}-{precinct_num}',
+    e.g. '04013-0206' → 'Maricopa Co. Precinct 206'.
+    Virginia independent cities omit 'Co.': '51640-005' → 'Hampton City Precinct 5'.
+    Falls back to 'County {county_fips[2:]} Precinct {num}' for unlisted counties.
+    """
+    m = re.match(r"^(\d{5})-(.+)$", precinct_id)
+    if not m:
+        # Not the expected format — strip any embedded name and return as-is.
+        parts = precinct_id.split(" ", 1)
+        return parts[1].strip() if len(parts) > 1 else precinct_id
+    county_fips, raw_num = m.group(1), m.group(2)
+    precinct_num = str(int(raw_num)) if raw_num.isdigit() else raw_num
+    county = _COUNTY_NAMES.get(county_fips)
+    if county:
+        # Independent cities already carry "City" in the name; skip "Co." suffix.
+        if county.endswith(" City"):
+            return f"{county} Precinct {precinct_num}"
+        return f"{county} Co. Precinct {precinct_num}"
+    return f"County {county_fips[2:]} Precinct {precinct_num}"
+
 
 class PrecinctsAgent:
     """
@@ -201,14 +507,17 @@ class PrecinctsAgent:
 
     @staticmethod
     def _parse_precinct_name(precinct_geoid: str) -> str:
-        """
-        Extracts the human-readable name from the full precinct GEOID string.
+        """Extract a human-readable name from a full precinct GEOID string.
 
-        Input:  "01001-10 JONES COMM_ CTR_"
-        Output: "JONES COMM_ CTR_"
+        When the GEOID encodes an embedded name ('01001-10 JONES COMM_ CTR_'),
+        that name is returned directly. When there is no embedded name (bare
+        GEOID like '04013-0206'), falls back to county FIPS lookup via
+        _format_precinct_label to produce 'Maricopa Co. Precinct 206'.
         """
         parts = precinct_geoid.split(" ", 1)
-        return parts[1].strip() if len(parts) > 1 else precinct_geoid
+        if len(parts) > 1 and parts[1].strip():
+            return parts[1].strip()
+        return _format_precinct_label(parts[0])
 
     @staticmethod
     def _compute_tract_education_weights(
@@ -572,11 +881,13 @@ class PrecinctsAgent:
         for _, row in top_targets.iterrows():
             raw_geoid = row["precinct_geoid"]
             precinct_id = raw_geoid.split(" ", 1)[0]
-            precinct_name = (
-                _precinct_name_map.get(raw_geoid)
-                or _precinct_name_map.get(precinct_id)
-                or PrecinctsAgent._parse_precinct_name(raw_geoid)
-            )
+            _topo_name = _precinct_name_map.get(raw_geoid) or _precinct_name_map.get(precinct_id)
+            # Use the TopoJSON name only when it is actually human-readable —
+            # i.e. not identical to the bare GEOID and not a plain number.
+            if _topo_name and _topo_name.strip() != precinct_id and not _topo_name.strip().isdigit():
+                precinct_name = _topo_name
+            else:
+                precinct_name = _format_precinct_label(precinct_id)
             record = {
                 "precinct_geoid": raw_geoid,
                 "precinct_id":    precinct_id,
