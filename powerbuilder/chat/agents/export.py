@@ -130,13 +130,8 @@ ORGANIZING_GLOSSARY = (
     "- ladder of engagement: progression from low-commitment to high-commitment actions.\n"
     "- rung: one step on the ladder of engagement.\n"
     "- persuadable: person not yet committed who could be moved with the right framing.\n"
-    "- power map: visual tool plotting stakeholders by power level and alignment.\n"
-    "- spectrum of allies: continuum from active support to active opposition.\n"
     "- escalation: deliberate increase in pressure or disruption across a campaign arc.\n"
-    "- polarize: deliberately force people to take sides, reducing the number of bystanders.\n"
-    "- PSAA: content structure of Problem, Solution, Action, Ask.\n"
-    "- mobilize vs. organize: mobilize activates known supporters, organize develops new leaders.\n"
-    "- declare victory and run: publish a momentum-sustaining win frame even when full demands are not met."
+    "- mobilize vs. organize: mobilize activates known supporters, organize develops new leaders."
 )
 
 GENERIC_TO_ORGANIZER = (
@@ -186,8 +181,8 @@ def _infer_power_type(query: str, active_agents: list | None = None) -> str:
     return "through"
 
 
-SYSTEM_PROMPT = (
-    "You are a senior political director or organizer in the popular-education tradition (re:power, "
+SYSTEM_PROMPT_ORGANIZING = (
+    "You are a senior organizer in the popular-education tradition (re:power, "
     "Wellstone, Ruckus Society, FWD.us Community Accelerator). You have received "
     "findings from specialist analysts. Synthesize them into a single clear "
     "non-repetitive professional briefing written in first person plural "
@@ -196,12 +191,23 @@ SYSTEM_PROMPT = (
     "Theory of Change in the form 'If we do X, then Y will happen' before "
     "naming any tactic, channel, or content. "
     "Use canonical organizing vocabulary (base, persuadable, target, ladder "
-    "of engagement, rung, spectrum of allies, escalation, mobilize vs. "
-    "organize, PSAA), not generic marketing language (followers, audience "
-    "reach, engagement funnel, conversion). "
+    "of engagement, rung, escalation, mobilize vs. organize), not generic "
+    "marketing language (followers, audience reach, engagement funnel, conversion). "
     "Do not invent information not present in the inputs. "
     "Defer to the most specific and most recently dated source when findings "
     "conflict. Do not mention AI, agents, or automated tools."
+)
+
+SYSTEM_PROMPT_ELECTORAL = (
+    "You are a senior political strategist writing for progressive campaigns and "
+    "organizations, which often support Democratic candidates. You have received "
+    "findings from specialist analysts covering election data, Census demographics, "
+    "research, messaging and budget estimates. Synthesize them into a single clear "
+    "non-repetitive professional program briefing written in first person plural "
+    "('we', 'our campaign'). Write in a direct, data-driven voice appropriate for "
+    "campaign staff. Use concrete numbers when available. Do not invent information "
+    "not present in the inputs. Defer to the most specific and most recently dated "
+    "source when findings conflict. Do not mention AI, agents, or automated tools."
 )
 
 # Agents whose presence together signals a full political plan run.
@@ -211,6 +217,7 @@ PLAN_AGENTS = {"researcher", "election_results", "win_number", "precincts", "mes
 PLAN_SECTION_ORDER = [
     "Executive Summary",
     "District Background",
+    "Contrast Research",
     "Target Universe and Demographics",
     "Geographic Targeting",
     "Messaging Strategy",
@@ -552,29 +559,73 @@ def _build_prompt(
             + "\n"
         )
 
-    pt = POWER_TYPES.get(power_type, POWER_TYPES["through"])
-    power_block = (
-        f"\nINFERRED POWER TYPE: {pt['label']} ({pt['definition']}).\n"
-        "Frame the Theory of Change in the opening paragraph against this power type "
-        "and reference it once more by name when explaining strategy.\n"
+    is_electoral = power_type == "through"
+
+    if is_electoral:
+        opening_block = (
+            f"\nDISTRICT CONTEXT: Write for {district_label}. "
+            "Open with 2-3 fluid sentences contextualizing the race \u2014 competitive landscape, "
+            "target voters, and what winning looks like. Reference specific numbers from "
+            "STRUCTURED DATA (win number, CVAP, projected turnout). Do not use the generic "
+            "\u2018If we do X, then Y will happen\u2019 formula.\n"
+            "Example: \u2018Arizona\u2019s 6th Congressional District is a competitive swing seat where "
+            "a Democratic victory requires turning out the base while persuading a narrow slice of "
+            "movable voters. With a win number of 149,547 votes and a projected turnout of "
+            "287,590, our margin for error is slim \u2014 every precinct decision and every contact counts.\u2019\n"
+        )
+        glossary_block = ""
+    else:
+        pt = POWER_TYPES.get(power_type, POWER_TYPES["through"])
+        opening_block = (
+            f"\nINFERRED POWER TYPE: {pt['label']} ({pt['definition']}).\n"
+            "Frame the Theory of Change in the opening paragraph in the form "
+            "\u2018If we do X, then Y will happen\u2019 before naming any tactic, channel, or content. "
+            "Reference this power type by name when explaining strategy.\n"
+        )
+        glossary_block = (
+            "\nCANONICAL ORGANIZING VOCABULARY (use these terms over generic marketing language):\n"
+            f"{ORGANIZING_GLOSSARY}\n\n{GENERIC_TO_ORGANIZER}\n"
+        )
+
+    # Signal: contrast research findings present when the American Bridge header appears.
+    has_contrast_research = "American Bridge Research Books" in research_context
+    has_precincts = _get_entry(structured_data, "precincts") is not None
+
+    # Injected between District Background and Target Universe for electoral plans.
+    contrast_research_section = (
+        "\n## Contrast Research\n"
+        "Cover: the other candidate's name and office if identified in the research findings; "
+        "their key vulnerabilities by issue area (economy, healthcare, public safety, etc.); "
+        "and 2-3 specific contrast messaging angles relevant to the target demographic. "
+        "If the research memo header contains a fallback_note indicating a state-level Republican "
+        "or Trump administration record was used, state this explicitly.\n"
+    ) if (has_contrast_research and is_electoral and is_plan) else ""
+
+    # Injected into the Geographic Targeting section.
+    precinct_instruction = (
+        "List the top 5-10 specific precinct names from PRECINCT DATA above with their "
+        "estimated target demographic population counts as a bullet list. "
+        "Do not use generic geographic descriptions like 'urban centers' or 'suburban areas'."
+    ) if has_precincts else (
+        "Precinct-level targeting data was not available for this district — state this "
+        "explicitly rather than writing generic geographic descriptions."
     )
 
-    glossary_block = (
-        "\nCANONICAL ORGANIZING VOCABULARY (use these terms over generic marketing language):\n"
-        f"{ORGANIZING_GLOSSARY}\n\n{GENERIC_TO_ORGANIZER}\n"
-    )
-
-    wont_do_block = (
-        "\nAfter the main content, append a final H2 section titled exactly "
-        "'What This Won\u2019t Do' (use a curly apostrophe). In 2 to 4 short bullets, "
-        "name the limits of this plan that still require human judgment, for example: "
-        "this plan does not replace 1:1 conversations with the base, this plan does not "
-        "include voter file or VAN access, this plan assumes the named target is the "
-        "correct decision-maker (verify before escalation), this plan does not handle "
-        "rapid-response decisions in real time. Pick limits that actually fit the briefing.\n"
-    )
+    # Injected into the Messaging Strategy section when contrast research is present.
+    contrast_messaging_note = (
+        "Messaging recommendations must reference the other candidate or party by name; "
+        "include at least one contrast angle per demographic segment grounded in the "
+        "contrast research findings (do not invent contrast angles); and not be limited "
+        "to affirmative themes only."
+    ) if has_contrast_research else ""
 
     if is_plan:
+        recommendations_note = (
+            "3–5 concrete, prioritised action items for the campaign with rationale for each."
+            if is_electoral else
+            "3–5 concrete, prioritised action items for the campaign with rationale for each. "
+            "Name each as a rung on the ladder of engagement where it fits."
+        )
         structure = f"""
 Produce a complete Political Program Plan in Markdown for {district_label}.
 Use H1 for the document title, H2 for each section. Do NOT use markdown tables —
@@ -588,7 +639,7 @@ Required H2 sections (use these exact titles):
 ## District Background
 Describe the district: geography, jurisdiction type, historical partisan lean,
 key communities, and any relevant political context. Draw from research findings.
-
+{contrast_research_section}
 ## Target Universe and Demographics
 Summarise the demographic patterns across the target precincts in narrative form —
 age, race/ethnicity, CVAP composition, and voter registration trends.
@@ -596,13 +647,13 @@ Do not reproduce raw numbers in a table — the precinct table will be inserted 
 
 ## Geographic Targeting
 Describe the logic behind the target precinct selection and how geographic
-concentration serves the win-number goal. Reference specific precincts where notable.
+concentration serves the win-number goal. {precinct_instruction}
 
 ## Messaging Strategy
 Present the messaging strategy: summarise the canvassing approach, phone banking plan,
 text messaging goals, mail narrative themes, and digital ad strategy, then include
 the full text of all scripts and copy produced by the messaging analyst.
-
+{contrast_messaging_note}
 ## Budget Estimate
 Narrative interpretation of the budget analysis. If a specific budget was provided,
 discuss what program it funds and what trade-offs were made. Do not reproduce tables —
@@ -617,24 +668,57 @@ number require? Cite the projected turnout and persuadable universe figures by n
 Do not reproduce numbers in a table — the win number table will be inserted here.
 
 ## Program Recommendations
-3–5 concrete, prioritised action items for the campaign with rationale for each.
-Name each as a rung on the ladder of engagement where it fits.
+{recommendations_note}
 
-{wont_do_block}
+Then end with (italicised):
+{_ATTRIBUTION}
+"""
+    elif "win_number" in active_agents:
+        structure = f"""
+Produce a focused win number briefing for {district_label} in Markdown.
+Use H2 for section headers. Use bullet lists and bold for emphasis.
+Do NOT include Methodology, Tactics, Theory of Change, or 'What This Won't Do' sections.
+
+Begin with an opening paragraph (no H2 header) of 2-3 sentences contextualizing the race:
+competitive landscape, target voters, and what winning looks like. Use the exact win number
+and projected turnout from WIN NUMBER DATA above.
+
+Then produce exactly these three H2 sections:
+
+## Win Number Calculation
+State the win number directly: 'The win number for {district_label} is X,XXX votes.'
+Then interpret: CVAP universe, projected turnout, persuadable universe, and what these
+numbers mean for program scale. Cite every figure from WIN NUMBER DATA by name.
+Do not reproduce numbers in a table.
+
+## Historical Context
+Summarize the electoral history of this district using the historical context and cycles
+from WIN NUMBER DATA. Include results data from ELECTION RESULTS DATA if present:
+margin trend, competitiveness classification, most recent cycle result.
+
+## Strategic Implications
+3-5 concrete bullets on what the win number means for the program: contact volume required,
+persuasion universe size, turnout cushion, and any data gaps to flag. Be specific to the
+figures provided — do not write generic campaign advice.
+
 Then end with (italicised):
 {_ATTRIBUTION}
 """
     else:
+        toc_line = (
+            ""
+            if is_electoral else
+            "The first paragraph must state the Theory of Change in the form "
+            "'If we do X, then Y will happen' before any tactics.\n"
+        )
         structure = f"""
-Produce a professional organizer briefing in Markdown responding to: "{query}"
+Produce a professional briefing in Markdown responding to: "{query}"
 Use H2 for major sections. Use bullet lists and bold for emphasis.
-The first paragraph must state the Theory of Change in the form
-"If we do X, then Y will happen" before any tactics.
-{wont_do_block}
+{toc_line}
 Then end with: {_ATTRIBUTION}
 """
 
-    return f"""{error_block}{power_block}{glossary_block}
+    return f"""{error_block}{opening_block}{glossary_block}
 USER REQUEST: {query}
 AGENTS THAT CONTRIBUTED: {', '.join(active_agents) if active_agents else 'none'}
 
@@ -670,9 +754,12 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
         power_type=power_type,
     )
 
+    system_prompt = (
+        SYSTEM_PROMPT_ELECTORAL if power_type == "through" else SYSTEM_PROMPT_ORGANIZING
+    )
     llm = get_completion_client(temperature=0.3)
     return llm.invoke(
-        [{"role": "system", "content": SYSTEM_PROMPT},
+        [{"role": "system", "content": system_prompt},
          {"role": "user",   "content": prompt}]
     ).content
 
@@ -961,6 +1048,14 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
 
     for title in ordered_titles:
         section_text = sections.get(title, "")
+        # Skip optional sections the LLM didn't generate (e.g. "Contrast Research" when
+        # no contrast research data was available). Always render sections that receive
+        # programmatic table injections, even when the LLM wrote no prose for them.
+        has_table_injection = (
+            "Win Number" in title or "Geographic" in title or "Budget" in title
+        )
+        if not section_text and not has_table_injection:
+            continue
         doc.add_heading(title, level=2)
         if section_text:
             _add_prose(doc, section_text)
