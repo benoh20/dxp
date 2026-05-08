@@ -408,7 +408,7 @@ def _format_precinct_label(precinct_id: str) -> str:
         parts = precinct_id.split(" ", 1)
         return parts[1].strip() if len(parts) > 1 else precinct_id
     county_fips, raw_num = m.group(1), m.group(2)
-    precinct_num = str(int(raw_num)) if raw_num.isdigit() else raw_num
+    precinct_num = str(int(raw_num)).zfill(3) if raw_num.isdigit() else raw_num
     county = _COUNTY_NAMES.get(county_fips)
     if county:
         # Independent cities already carry "City" in the name; skip "Co." suffix.

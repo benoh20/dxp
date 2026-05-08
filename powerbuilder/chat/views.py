@@ -533,10 +533,25 @@ def stream_query_view(request):
         yield _format_sse({"type": "hello", "run_id": run_id})
         worker_thread.start()
         try:
-            for evt in progress.drain(run_id):
-                # The wrapper signals completion via run_finished, which we do
-                # not forward; we exit the loop and emit a final ``done`` frame
-                # carrying the rendered HTML.
+            # Keepalive drain: poll the queue directly with a 15-second
+            # timeout. When the queue is empty (agents are working silently)
+            # yield an SSE comment instead of a data frame. SSE comments keep
+            # the TCP connection alive without firing EventSource.onmessage,
+            # so the browser never sees spurious events. progress.drain()
+            # was yielding JSON ping frames every second but some browsers and
+            # proxies still timed out on long (3+ min) pipeline runs.
+            import queue as _queue_mod
+            _run_q = progress.create(run_id)   # idempotent — queue already allocated
+            _deadline = time.time() + progress.DEFAULT_RUN_TIMEOUT_SECS
+            while True:
+                if time.time() >= _deadline:
+                    yield _format_sse({"type": "error", "label": "Run timed out"})
+                    break
+                try:
+                    evt = _run_q.get(timeout=15)
+                except _queue_mod.Empty:
+                    yield ': keepalive\n\n'
+                    continue
                 if evt.type == "run_finished":
                     break
                 yield _format_sse(evt.to_dict())
