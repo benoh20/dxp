@@ -572,7 +572,7 @@ def stream_query_view(request):
                 return
 
             result = holder["result"] or {}
-            payload = _build_done_payload(request, query, result)
+            payload = _build_done_payload(request, query, result, llm_provider)
             yield _format_sse(payload)
         finally:
             progress.finish(run_id)
@@ -583,7 +583,7 @@ def stream_query_view(request):
     return response
 
 
-def _build_done_payload(request, query: str, result: dict) -> dict:
+def _build_done_payload(request, query: str, result: dict, llm_provider=None) -> dict:
     """
     Render the final assistant bubble HTML from a completed pipeline result
     and persist the message into the user's session, mirroring the
