@@ -32,12 +32,14 @@ import hashlib
 import logging
 import os
 import re
+import threading
 from datetime import datetime
 from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()
 
+from .. import progress as _progress
 from ..utils.llm_config import get_completion_client
 
 from .state import AgentState
@@ -765,8 +767,14 @@ STRUCTURED DATA (win number, precincts, budget):
 {structure}"""
 
 
-def _synthesize(state: AgentState, is_plan: bool) -> str:
-    """Single GPT-4o call with the senior strategist system prompt."""
+def _synthesize(state: AgentState, is_plan: bool, run_id: str | None = None) -> str:
+    """Single GPT-4o call with the senior strategist system prompt.
+
+    When run_id is set (streaming path), emits agent_start before the call,
+    a trace keepalive every 10 seconds during the (potentially 60-90 s) LLM
+    call, and agent_done on completion. The LLM call runs in a daemon thread
+    so the main agent thread can emit events instead of blocking silently.
+    """
     research_results = _dedup(state.get("research_results", []))
     structured_data  = state.get("structured_data", [])
     active_agents    = state.get("active_agents", [])
@@ -792,10 +800,44 @@ def _synthesize(state: AgentState, is_plan: bool) -> str:
         SYSTEM_PROMPT_ELECTORAL if power_type == "through" else SYSTEM_PROMPT_ORGANIZING
     )
     llm = get_completion_client(temperature=0.3)
-    return llm.invoke(
-        [{"role": "system", "content": system_prompt},
-         {"role": "user",   "content": prompt}]
-    ).content
+
+    _progress.emit(run_id, "agent_start", agent="synthesizer",
+                   label="Synthesizing plan...")
+
+    # Run the blocking LLM call in a daemon thread so the main thread can
+    # emit keepalive progress events every 10 seconds. Without this, a 60-90 s
+    # LLM call produces no SSE queue output, and the browser's EventSource may
+    # drop even with SSE comment keepalives if there is nothing agent-side to
+    # forward. _progress.emit() is a no-op when run_id is None.
+    _holder: dict = {"content": None, "error": None}
+
+    def _invoke():
+        try:
+            _holder["content"] = llm.invoke(
+                [{"role": "system", "content": system_prompt},
+                 {"role": "user",   "content": prompt}]
+            ).content
+        except Exception as exc:
+            _holder["error"] = exc
+
+    _t = threading.Thread(target=_invoke, daemon=True)
+    _t.start()
+
+    _elapsed = 0
+    while _t.is_alive():
+        _t.join(timeout=10)
+        if _t.is_alive():
+            _elapsed += 10
+            _progress.emit(run_id, "trace", agent="synthesizer",
+                           label=f"Writing plan... ({_elapsed}s)")
+
+    if _holder["error"]:
+        _progress.emit(run_id, "agent_done", agent="synthesizer",
+                       label="Synthesis failed")
+        raise _holder["error"]
+
+    _progress.emit(run_id, "agent_done", agent="synthesizer", label="Plan ready")
+    return _holder["content"]
 
 
 # ---------------------------------------------------------------------------
@@ -1323,7 +1365,7 @@ def export_node(state: AgentState) -> dict:
     # 1. Synthesize
     # -----------------------------------------------------------------------
     try:
-        synthesis = _synthesize(state, is_plan)
+        synthesis = _synthesize(state, is_plan, run_id=state.get("run_id"))
     except Exception as e:
         logger.error(f"ExportAgent: synthesis LLM call failed — {e}")
         fallback = "\n\n".join(_dedup(state.get("research_results", [])))
