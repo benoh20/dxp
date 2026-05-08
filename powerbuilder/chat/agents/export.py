@@ -1141,12 +1141,26 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
             if win_entry:
                 doc.add_heading("Win Number Summary", level=3)
                 _add_table(doc, *_win_table(win_entry))
+            else:
+                available = [d.get("agent") for d in structured_data]
+                logger.warning(
+                    "ExportAgent: Win Number table skipped — no 'win_number' entry in "
+                    "structured_data. Available agent keys: %s", available
+                )
 
         elif "Geographic" in title:
             if precincts:
                 doc.add_heading(f"Top {len(precincts)} Target Precincts", level=3)
                 h, r = _precinct_table(precincts)
                 _add_table(doc, h, r)
+            else:
+                available = [d.get("agent") for d in structured_data]
+                precinct_keys = list((precinct_entry or {}).keys())
+                logger.warning(
+                    "ExportAgent: Precinct table skipped — 'precincts' list is empty or "
+                    "missing. precinct_entry keys: %s | structured_data agents: %s",
+                    precinct_keys, available
+                )
 
         elif "Budget" in title:
             if finance_entry:
@@ -1158,6 +1172,12 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
                     _add_table(doc, *fec)
                 if paid_media_plan:
                     _render_paid_media_section(doc, paid_media_plan)
+            else:
+                available = [d.get("agent") for d in structured_data]
+                logger.warning(
+                    "ExportAgent: Budget table skipped — no 'finance' entry in "
+                    "structured_data. Available agent keys: %s", available
+                )
 
     os.makedirs(EXPORTS_DIR, exist_ok=True)
     path = os.path.join(EXPORTS_DIR, _safe_filename(district_label, "docx"))

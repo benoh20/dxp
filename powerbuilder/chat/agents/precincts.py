@@ -905,6 +905,11 @@ class PrecinctsAgent:
             total_vap_val = float(row.get("weighted_total_vap", 0) or 0)
             if use_combined_target:
                 target_val = float(row.get("weighted_combined_target", 0) or 0)
+                # Cap at total_vap: summing e.g. youth_vap + hispanic_vap can
+                # exceed total_vap because the same person appears in both groups.
+                # Penetration cannot exceed 100 % by definition.
+                if total_vap_val > 0:
+                    target_val = min(target_val, total_vap_val)
             else:
                 target_val = float(row.get(f"weighted_{metrics[0]}", 0) or 0)
 
@@ -1085,7 +1090,10 @@ TOP_N: [integer number of precincts to return, default 20]
         if len(intents) > 1:
             state_update["structured_data"][0]["combined_demographics_note"] = (
                 f"Multi-demographic targeting: combined {' + '.join(intents)} groups. "
-                f"Precincts ranked by sum of: {', '.join(combined_primary_metrics or [])}."
+                f"Precincts ranked by sum of: {', '.join(combined_primary_metrics or [])}. "
+                "target_demographic_vap is capped at total_vap — overlap between groups "
+                "(e.g. a voter who is both young and Hispanic) means penetration_rate "
+                "reflects estimated, not additive, coverage."
             )
 
         return state_update
