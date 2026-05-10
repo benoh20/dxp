@@ -218,6 +218,8 @@ PLAN_AGENTS = {"researcher", "election_results", "win_number", "precincts", "mes
 # Section titles used in the plan docx — must match the template and synthesis prompt.
 PLAN_SECTION_ORDER = [
     "Executive Summary",
+    "Why We Need to Win",
+    "Lay of the Land",
     "District Background",
     "Contrast Research",
     "Target Universe and Demographics",
@@ -383,7 +385,18 @@ def _precinct_table(precincts: list) -> tuple:
         row = [p.get("precinct_name") or p.get("precinct_geoid", "")]
         for k in metric_keys:
             val = p.get(k)
-            row.append(f"{float(val):,.0f}" if isinstance(val, (int, float)) else str(val or ""))
+            if isinstance(val, (int, float)):
+                if k == "target_demographic_pct":
+                    # Already multiplied by 100 (e.g. 39 → "39.10%")
+                    formatted = f"{float(val):.2f}%"
+                elif k == "penetration_rate":
+                    # Stored as a fraction (e.g. 0.3928 → "39.28%")
+                    formatted = f"{float(val) * 100:.2f}%"
+                else:
+                    formatted = f"{float(val):,.0f}"
+            else:
+                formatted = str(val or "")
+            row.append(formatted)
         rows.append(row)
     return headers, rows
 
@@ -410,16 +423,21 @@ def _budget_tables(finance_entry: dict) -> tuple:
         h = ["Tactic", "Unit Cost", "Contact Goal", "Budget Allocated"]
         r = [
             [
-                tactic_labels.get(t, t),
+                tactic_labels[t],
                 f"${d['unit_cost']:.2f}",
                 f"{d['contacts']:,}",
                 _fmt_money(d["budget_allocated"]),
             ]
             for t, d in budget_program.items()
+            if t in tactic_labels
         ]
     else:
         h = ["Tactic", "Unit Cost"]
-        r = [[tactic_labels.get(k, k), f"${v:.2f}"] for k, v in unit_costs.items()]
+        r = [
+            [tactic_labels[k], f"${v:.2f}"]
+            for k, v in unit_costs.items()
+            if k in tactic_labels
+        ]
 
     unit_cost_table = (h, r)
 
@@ -504,6 +522,12 @@ def _format_structured_for_prompt(structured_data: list) -> str:
             lines.append(f"  Competitiveness: {er['competitiveness']}")
         if er.get("cook_pvi"):
             lines.append(f"  Cook PVI: {er['cook_pvi']}")
+        if er.get("race_rating"):
+            lines.append(f"  Race rating: {er['race_rating']}")
+        if er.get("incumbent"):
+            lines.append(f"  Incumbent: {er['incumbent']}")
+        if er.get("trend"):
+            lines.append(f"  Trend: {er['trend']}")
         mr = er.get("most_recent") or {}
         if mr.get("year"):
             lines.append(
@@ -517,6 +541,18 @@ def _format_structured_for_prompt(structured_data: list) -> str:
                     f"  Vote share: D {mr['dem_pct'] * 100:.1f}% / "
                     f"R {mr['rep_pct'] * 100:.1f}% ({party}+{abs(m) * 100:.1f}%)"
                 )
+        cb = er.get("climate_breakdown") or {}
+        for climate_type, data in cb.items():
+            if data and data.get("n", 0) > 0:
+                avg_m  = data.get("avg_margin")
+                cycles = data.get("cycles", [])
+                if avg_m is not None:
+                    party      = "D" if avg_m >= 0 else "R"
+                    cycles_str = f" ({', '.join(str(c) for c in cycles)})" if cycles else ""
+                    lines.append(
+                        f"  {climate_type.title()} avg ({data['n']} cycles{cycles_str}): "
+                        f"{party}+{abs(avg_m) * 100:.1f}%"
+                    )
         blocks.append("\n".join(lines))
 
     precincts_entry = _get_entry(structured_data, "precincts")
@@ -564,6 +600,7 @@ def _build_prompt(
     is_plan: bool,
     district_label: str,
     power_type: str = "through",
+    has_script_pack: bool = False,
 ) -> str:
 
     structured_context = _format_structured_for_prompt(structured_data)
@@ -662,6 +699,18 @@ def _build_prompt(
             "3–5 concrete, prioritised action items for the campaign with rationale for each. "
             "Name each as a rung on the ladder of engagement where it fits."
         )
+        if has_script_pack:
+            messaging_strategy_body = (
+                "Describe the messaging themes and channel strategy. "
+                "Do NOT include any script text, pivot lines, or copy — "
+                "those will appear in the separate Script Pack document."
+            )
+        else:
+            messaging_strategy_body = (
+                "Present the messaging strategy: summarise the canvassing approach, phone banking plan,\n"
+                "text messaging goals, mail narrative themes, and digital ad strategy, then include\n"
+                "the full text of all scripts and copy produced by the messaging analyst."
+            )
         structure = f"""
 Produce a complete Political Program Plan in Markdown for {district_label}.
 Use H1 for the document title, H2 for each section. Do NOT use markdown tables —
@@ -671,6 +720,35 @@ Required H2 sections (use these exact titles):
 
 ## Executive Summary
 2–3 paragraphs on the race, the opportunity, and the strategy to win.
+
+## Why We Need to Win
+Write two paragraphs. First: the national stakes — draw specifically from opposition
+research findings if available (documented issue vulnerabilities by name, e.g. votes to
+cut Medicare, tariff positions, housing policy positions — do not write generically about
+"the stakes"). Second: the district-specific stakes — use election results data:
+competitiveness classification, historical margins, trend direction, and why holding
+or flipping this seat matters for the balance of power.
+Then include these two placeholder blocks exactly as written (on their own lines):
+[FILL IN: Add your organization's specific mission and why this race connects to your long-term goals. What does winning mean for the communities you serve?]
+[FILL IN: Add any local or state-level context that makes this race particularly important for your organization — ballot initiatives, down-ballot races, coalition commitments, etc.]
+
+## Lay of the Land
+Use three H3 subsections:
+
+### What Happened Last Cycle
+2–3 sentences on the most recent cycle result from election results data: margin of
+victory or defeat, total votes cast, and trend direction if available.
+
+### Election Administration
+State the general election date (November of the target election year). Include
+primary timing only if it is present in the data — do not invent it.
+Then include this placeholder block exactly as written (on its own line):
+[FILL IN: Add state-specific voting rules — early vote availability, mail ballot rules, registration deadlines, same-day registration, voter ID requirements]
+
+### The Political Landscape
+2–3 sentences using Cook PVI or historical margins: characterize the seat as a safe
+hold, competitive hold, flip opportunity, or reach. Note the incumbent if identified
+in the election data.
 
 ## District Background
 Describe the district: geography, jurisdiction type, historical partisan lean,
@@ -686,9 +764,7 @@ Describe the logic behind the target precinct selection and how geographic
 concentration serves the win-number goal. {precinct_instruction}
 
 ## Messaging Strategy
-Present the messaging strategy: summarise the canvassing approach, phone banking plan,
-text messaging goals, mail narrative themes, and digital ad strategy, then include
-the full text of all scripts and copy produced by the messaging analyst.
+{messaging_strategy_body}
 {contrast_messaging_note}
 ## Budget Estimate
 Narrative interpretation of the budget analysis. If a specific budget was provided,
@@ -783,7 +859,8 @@ def _synthesize(state: AgentState, is_plan: bool, run_id: str | None = None) -> 
     research_ctx = "\n\n".join(research_results) or "No research collected."
     district_lbl = _district_label(structured_data)
 
-    power_type = _infer_power_type(state.get("query", ""), active_agents)
+    power_type      = _infer_power_type(state.get("query", ""), active_agents)
+    has_script_pack = any(d.get("agent") == "script_pack" for d in structured_data)
 
     prompt = _build_prompt(
         query=state.get("query", ""),
@@ -794,6 +871,7 @@ def _synthesize(state: AgentState, is_plan: bool, run_id: str | None = None) -> 
         is_plan=is_plan,
         district_label=district_lbl,
         power_type=power_type,
+        has_script_pack=has_script_pack,
     )
 
     system_prompt = (
@@ -877,17 +955,37 @@ def _bold_runs(para, text: str):
             run.bold = bool(i % 2)
 
 
+def _add_fill_in_block(doc, text: str):
+    """Render a [FILL IN: ...] placeholder as an italic paragraph with light gray shading."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    para = doc.add_paragraph()
+    run  = para.add_run(text)
+    run.italic = True
+
+    pPr = para._p.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"),   "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"),  "F0F0F0")  # RGBColor(240, 240, 240)
+    pPr.append(shd)
+
+
 def _add_prose(doc, text: str):
     """
     Add Markdown prose to a docx Document.
-    Handles: ### headings, - bullets, *italic recency notes*, bold (**text**).
+    Handles: ### headings, - bullets, *italic recency notes*, bold (**text**),
+    and [FILL IN: ...] placeholder blocks (italic + light gray shading).
     Skips markdown table rows (lines starting with |) — tables added separately.
     """
     for line in text.splitlines():
         s = line.strip()
         if not s or s.startswith("|") or re.match(r"^[-|: ]+$", s):
             continue
-        if s.startswith("### "):
+        if s.startswith("[FILL IN"):
+            _add_fill_in_block(doc, s)
+        elif s.startswith("### "):
             doc.add_heading(s[4:], level=3)
         elif s.startswith("- ") or s.startswith("* "):
             _bold_runs(doc.add_paragraph(style="List Bullet"), s[2:])
@@ -1367,6 +1465,12 @@ def export_node(state: AgentState) -> dict:
 
     is_plan      = PLAN_AGENTS.issubset(set(active_agents))
     district_lbl = _district_label(structured_data)
+
+    has_script_pack = any(d.get("agent") == "script_pack" for d in structured_data)
+    logger.info(
+        f"has_script_pack: {has_script_pack}, "
+        f"script pack agent found: {any(d.get('agent') == 'script_pack' for d in structured_data)}"
+    )
 
     # Compute the inferred power type up front so it is available both to
     # the synthesizer prompt and to the structured_data the UI reads. Note:

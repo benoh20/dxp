@@ -841,7 +841,24 @@ Do not rename, reorder, or omit any marker.
         f"using research dated as recently as {most_recent_date}."
     )
 
+    script_pack_entry = {
+        "agent":   "script_pack",
+        "canvass": sections.get("canvassing_script", ""),
+        "phone":   sections.get("phone_script", ""),
+        "text":    sections.get("text_script", ""),
+        "mail":    sections.get("mail_narrative", ""),
+        "digital": sections.get("digital_copy", ""),
+        "meta":    sections.get("meta_post", ""),
+        "youtube": sections.get("youtube_script", ""),
+        "tiktok":  sections.get("tiktok_script", ""),
+    }
+    logger.info(
+        f"script_pack_entry keys: {list(script_pack_entry.keys())}, "
+        f"canvass length: {len(script_pack_entry.get('canvass', ''))}"
+    )
+
     return {
         "research_results": formatted_outputs,
+        "structured_data":  [script_pack_entry],
         "active_agents":    ["messaging"],
     }
