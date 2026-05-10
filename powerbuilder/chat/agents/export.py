@@ -373,13 +373,31 @@ def _win_table(win_entry: dict) -> tuple:
     return headers, rows
 
 
+_PRECINCT_HEADER_LABELS: dict[str, str] = {
+    "youth_vap":              "Youth VAP",
+    "college_enrolled":       "College Enrolled",
+    "total_vap":              "Total VAP",
+    "target_demographic_vap": "Target Demographic VAP",
+    "target_demographic_pct": "Target Demographic Pct",
+}
+
+
 def _precinct_table(precincts: list) -> tuple:
-    """Build (headers, rows) from a list of precinct dicts."""
+    """Build (headers, rows) from a list of precinct dicts.
+
+    Penetration Rate is excluded — it duplicates Target Demographic Pct.
+    """
     if not precincts:
         return [], []
-    exclude = {"precinct_geoid", "precinct_id", "approximate_boundary", "precinct_name"}
+    exclude = {
+        "precinct_geoid", "precinct_id", "approximate_boundary",
+        "precinct_name", "penetration_rate",
+    }
     metric_keys = [k for k in precincts[0] if k not in exclude]
-    headers = ["Precinct"] + [k.replace("_", " ").title() for k in metric_keys]
+    headers = [
+        "Precinct",
+        *[_PRECINCT_HEADER_LABELS.get(k, k.replace("_", " ").title()) for k in metric_keys],
+    ]
     rows = []
     for p in precincts:
         row = [p.get("precinct_name") or p.get("precinct_geoid", "")]
@@ -387,11 +405,7 @@ def _precinct_table(precincts: list) -> tuple:
             val = p.get(k)
             if isinstance(val, (int, float)):
                 if k == "target_demographic_pct":
-                    # Already multiplied by 100 (e.g. 39 → "39.10%")
                     formatted = f"{float(val):.2f}%"
-                elif k == "penetration_rate":
-                    # Stored as a fraction (e.g. 0.3928 → "39.28%")
-                    formatted = f"{float(val) * 100:.2f}%"
                 else:
                     formatted = f"{float(val):,.0f}"
             else:
@@ -658,9 +672,17 @@ def _build_prompt(
 
     # Injected into the Geographic Targeting section.
     precinct_instruction = (
-        "List the top 5-10 specific precinct names from PRECINCT DATA above with their "
-        "estimated target demographic population counts as a bullet list. "
-        "Do not use generic geographic descriptions like 'urban centers' or 'suburban areas'."
+        "Present the target precincts as three priority tiers based on target demographic "
+        "concentration. Use the specific precinct names and demographic figures from "
+        "PRECINCT DATA — do not use generic descriptions like 'urban centers' or 'suburban areas'.\n"
+        "- **Tier 1** (top 5 precincts by target demographic concentration): highest priority "
+        "for door knocking and direct voter contact. Name each precinct and cite its target "
+        "demographic figure.\n"
+        "- **Tier 2** (next 10 precincts): priority for phone banking and text messaging. "
+        "Name the precincts and briefly note the concentration level.\n"
+        "- **Tier 3** (remaining precincts): mail and digital only. Describe collectively.\n"
+        "For each tier explain the strategic logic — why this contact intensity given the "
+        "demographic concentration and win-number requirements."
     ) if has_precincts else (
         "Precinct-level targeting data was not available for this district — state this "
         "explicitly rather than writing generic geographic descriptions."
@@ -699,7 +721,29 @@ def _build_prompt(
             "3–5 concrete, prioritised action items for the campaign with rationale for each. "
             "Name each as a rung on the ladder of engagement where it fits."
         )
-        if has_script_pack:
+        if has_script_pack and is_electoral:
+            messaging_strategy_body = (
+                "Write 3–4 paragraphs of strategic narrative. "
+                "Scripts and copy are in the separate Script Pack — do NOT reproduce them here.\n\n"
+                "(a) **Core message theme**: what is the central message and why does it resonate "
+                "with the specific demographic profile of the target precincts? Ground this in the "
+                "research findings and precinct demographic data — not a generic theme.\n\n"
+                "(b) **Channel strategy**: for each of the five field channels, describe its "
+                "specific role in this program, what it is designed to accomplish, and at what "
+                "stage of the campaign it is deployed:\n"
+                "- Canvassing: role and campaign stage\n"
+                "- Phone banking: role and campaign stage\n"
+                "- Text messaging: role and campaign stage\n"
+                "- Direct mail: role and campaign stage\n"
+                "- Digital advertising: role and campaign stage\n\n"
+                "(c) **Contrast integration**: describe how contrast messaging is woven into the "
+                "channel strategy without naming the opponent directly in direct voter contact "
+                "(positive framing only in canvassing and phone). Explain where contrast is "
+                "appropriate (paid digital, mail) and where it is not (door knocks, texts).\n\n"
+                "(d) **Message testing**: describe what variants to test first, what metrics "
+                "indicate message resonance, and how the campaign should iterate."
+            )
+        elif has_script_pack:
             messaging_strategy_body = (
                 "Describe the messaging themes and channel strategy. "
                 "Do NOT include any script text, pivot lines, or copy — "
@@ -736,8 +780,18 @@ Then include these two placeholder blocks exactly as written (on their own lines
 Use three H3 subsections:
 
 ### What Happened Last Cycle
-2–3 sentences on the most recent cycle result from election results data: margin of
-victory or defeat, total votes cast, and trend direction if available.
+Write 3–4 sentences using ELECTION RESULTS DATA. Cover all four points:
+- The most recent cycle year and total votes cast — cite the exact figure from
+  'Most recent cycle (YEAR): N total votes cast'.
+- The margin: if party-level vote share is available state it explicitly
+  (e.g. 'D 54.2% / R 45.8%, a D+8.4 margin'). If MEDSL party-level data is
+  unavailable, say so explicitly and describe what data IS available (e.g.
+  competitiveness rating, Cook PVI) rather than writing generic text.
+- Trend direction: if a trend line is present state the direction and the
+  underlying margin movement. If no trend data is available, say so.
+- Win number context: given the win number from WIN NUMBER DATA, how close
+  was the actual last-cycle result to that threshold — comfortable, narrow, or
+  a loss that defines the gap we must close?
 
 ### Election Administration
 State the general election date (November of the target election year). Include
@@ -751,8 +805,20 @@ hold, competitive hold, flip opportunity, or reach. Note the incumbent if identi
 in the election data.
 
 ## District Background
-Describe the district: geography, jurisdiction type, historical partisan lean,
-key communities, and any relevant political context. Draw from research findings.
+Write with specific numbers — do not produce generic boilerplate. Include all of:
+- **Geographic character**: urban/suburban/rural mix if inferable from the district
+  label or research findings; jurisdiction type (congressional, state house, etc.).
+- **Census demographic profile**: cite specific figures from PRECINCT DATA and
+  STRUCTURED DATA — total CVAP universe, Hispanic/Latino population share, youth VAP
+  share, and any other demographic concentrations present in the data. Use actual
+  percentages and counts, not vague phrases like 'a significant Hispanic community'.
+- **Economic profile**: if research_results contain income, employment, housing cost,
+  or cost-of-living data for this district, cite those figures. If not present, omit
+  this point entirely — do not invent or estimate.
+- **Historical partisan lean**: draw from ELECTION RESULTS DATA — the actual margins,
+  trend direction, and competitiveness classification.
+- **Key communities and political context**: which coalitions have been organized here,
+  what issues have driven turnout historically, and any relevant political infrastructure.
 {contrast_research_section}
 ## Target Universe and Demographics
 Summarise the demographic patterns across the target precincts in narrative form —
@@ -1420,6 +1486,61 @@ def _write_csv(synthesis: str, state: AgentState, district_label: str) -> dict:
     return {"final_answer": brief, "generated_file_path": path}
 
 
+def _write_script_pack_docx(script_pack: dict, district_label: str) -> dict:
+    """
+    Build a Script Pack Word document from a script_pack structured_data entry.
+    Contains all eight messaging formats as separate H2 sections.
+    """
+    try:
+        from docx import Document
+    except ImportError:
+        return {"errors": ["ExportAgent: python-docx not installed — cannot write script pack."]}
+
+    if os.path.exists(TEMPLATE_PATH):
+        doc = Document(TEMPLATE_PATH)
+        from docx.oxml.ns import qn as _qn
+        body = doc.element.body
+        for child in list(body):
+            if child.tag != _qn("w:sectPr"):
+                body.remove(child)
+    else:
+        doc = Document()
+
+    doc.add_heading(f"{district_label} — Script Pack", 0)
+
+    _SCRIPT_SECTIONS = [
+        ("canvass", "Canvassing Script"),
+        ("phone",   "Phone Banking Script"),
+        ("text",    "Text Message Templates"),
+        ("mail",    "Mail Narrative"),
+        ("digital", "Digital Ad Copy"),
+        ("meta",    "Meta Post (Facebook / Instagram)"),
+        ("youtube", "YouTube Script"),
+        ("tiktok",  "TikTok / Reels Script"),
+    ]
+
+    any_content = False
+    for key, title in _SCRIPT_SECTIONS:
+        content = (script_pack.get(key) or "").strip()
+        if not content:
+            continue
+        any_content = True
+        doc.add_heading(title, level=2)
+        _add_prose(doc, content)
+        doc.add_paragraph()  # spacer
+
+    if not any_content:
+        logger.warning("ExportAgent: script_pack entry has no section content — empty docx skipped.")
+        return {}
+
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
+    path = os.path.join(EXPORTS_DIR, _safe_filename(f"{district_label}_scripts", "docx"))
+    doc.save(path)
+    logger.info(f"ExportAgent: saved script pack docx → {path}")
+
+    return {"generated_file_path": path}
+
+
 # ---------------------------------------------------------------------------
 # Format handler dispatch
 # ---------------------------------------------------------------------------
@@ -1467,6 +1588,7 @@ def export_node(state: AgentState) -> dict:
     district_lbl = _district_label(structured_data)
 
     has_script_pack = any(d.get("agent") == "script_pack" for d in structured_data)
+    print(f"has_script_pack={has_script_pack}")  # TODO: remove after confirming script pack generation
     logger.info(
         f"has_script_pack: {has_script_pack}, "
         f"script pack agent found: {any(d.get('agent') == 'script_pack' for d in structured_data)}"
@@ -1540,6 +1662,27 @@ def export_node(state: AgentState) -> dict:
                     f"ExportAgent: Could not generate CSV companion - {e}"
                 )
                 result["errors"] = existing_errors
+
+    # ---- 2c. Script Pack DOCX for full plans with messaging output ----------
+    if is_plan and has_script_pack:
+        script_pack = _get_entry(structured_data, "script_pack")
+        if script_pack:
+            try:
+                sp_result = _write_script_pack_docx(script_pack, district_lbl)
+                sp_path = sp_result.get("generated_file_path")
+                if sp_path and sp_path not in generated_files:
+                    generated_files.append(sp_path)
+                if sp_result.get("errors"):
+                    existing_errors = list(result.get("errors", []))
+                    existing_errors.extend(sp_result["errors"])
+                    result["errors"] = existing_errors
+            except Exception as e:
+                logger.error(f"ExportAgent: script pack docx failed — {e}")
+                existing_errors = list(result.get("errors", []))
+                existing_errors.append(f"ExportAgent: Could not generate script pack — {e}")
+                result["errors"] = existing_errors
+        else:
+            logger.warning("ExportAgent: has_script_pack=True but _get_entry found no script_pack entry")
 
     if generated_files:
         result["generated_files"] = generated_files
