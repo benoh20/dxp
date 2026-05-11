@@ -847,15 +847,17 @@ class PrecinctsAgent:
                 logger.warning("  Tract-level education weighting failed; education metrics will be absent from output.")
 
         # 6c. Combined targeting metric (multi-demographic queries).
-        # Sum the primary weighted column from each demographic group so the sort
-        # reflects the union of targets rather than either group alone.
+        # Use the MAX of the primary weighted columns so the sort reflects the
+        # strongest single-group concentration in each precinct. Summing would
+        # overcount — e.g. youth_vap + hispanic_vap double-counts voters who are
+        # both young and Hispanic, pushing the aggregate above total_vap.
         if combined_primary_metrics:
             avail_combined = [
                 f"weighted_{m}" for m in combined_primary_metrics
                 if f"weighted_{m}" in precinct_totals.columns
             ]
             if avail_combined:
-                precinct_totals["weighted_combined_target"] = precinct_totals[avail_combined].sum(axis=1)
+                precinct_totals["weighted_combined_target"] = precinct_totals[avail_combined].max(axis=1)
 
         use_combined_target = "weighted_combined_target" in precinct_totals.columns
 
@@ -904,12 +906,8 @@ class PrecinctsAgent:
             # Always-present targeting columns
             total_vap_val = float(row.get("weighted_total_vap", 0) or 0)
             if use_combined_target:
+                # weighted_combined_target = max(primary1, primary2) — no cap needed.
                 target_val = float(row.get("weighted_combined_target", 0) or 0)
-                # Cap at total_vap: summing e.g. youth_vap + hispanic_vap can
-                # exceed total_vap because the same person appears in both groups.
-                # Penetration cannot exceed 100 % by definition.
-                if total_vap_val > 0:
-                    target_val = min(target_val, total_vap_val)
             else:
                 target_val = float(row.get(f"weighted_{metrics[0]}", 0) or 0)
 
@@ -1090,10 +1088,10 @@ TOP_N: [integer number of precincts to return, default 20]
         if len(intents) > 1:
             state_update["structured_data"][0]["combined_demographics_note"] = (
                 f"Multi-demographic targeting: combined {' + '.join(intents)} groups. "
-                f"Precincts ranked by sum of: {', '.join(combined_primary_metrics or [])}. "
-                "target_demographic_vap is capped at total_vap — overlap between groups "
-                "(e.g. a voter who is both young and Hispanic) means penetration_rate "
-                "reflects estimated, not additive, coverage."
+                f"Precincts ranked by the larger of: {', '.join(combined_primary_metrics or [])}. "
+                "Each demographic's VAP is shown as a separate column. "
+                "target_demographic_vap reflects the dominant group (not a sum) to avoid "
+                "double-counting voters who appear in multiple demographic groups."
             )
 
         return state_update

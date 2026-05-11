@@ -502,8 +502,9 @@ def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple
     """
     Build (headers, rows) comparing the voter file universe to the district CVAP baseline.
 
+    Columns: Dimension | Our Universe % | District Baseline % | Difference (pp)
     Dimensions with no Census equivalent (partisan tier, turnout tier, gender) show 'N/A†'.
-    Where precincts data allows a partial baseline (Hispanic %, Youth VAP %) it is used
+    Where precincts data allows a partial baseline (Hispanic %, Youth VAP %) it is included
     with a note that figures are from the target precincts, not the full district.
     """
     summary = vf_entry.get("summary", {})
@@ -516,57 +517,71 @@ def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple
     hisp_pop   = sum(float(p.get("hispanic_pop", 0) or 0) for p in precincts_list)
     youth_vap  = sum(float(p.get("youth_vap",   0) or 0) for p in precincts_list)
 
-    def _pct(count):
-        return f"{count / total * 100:.2f}%"
+    def _u_pct(count) -> float:
+        return count / total * 100
 
-    def _baseline_pct(numerator, denominator, note=""):
+    def _b_pct(numerator, denominator) -> Optional[float]:
         if denominator > 0 and numerator > 0:
-            label = f"{numerator / denominator * 100:.2f}%"
-            return f"{label} {note}".strip()
-        return "N/A†"
+            return numerator / denominator * 100
+        return None
 
-    headers  = ["Dimension", "Our Universe", "District Baseline"]
+    def _fmt_pct(val: float) -> str:
+        return f"{val:.1f}%"
+
+    def _fmt_diff(u_pct: float, b_pct: Optional[float]) -> str:
+        if b_pct is None:
+            return "N/A†"
+        diff = u_pct - b_pct
+        return f"{diff:+.1f} pp"
+
+    headers  = ["Dimension", "Our Universe %", "District Baseline %", "Difference"]
     rows: list[list[str]] = []
     has_na   = False
 
     for tier, count in sorted(
         summary.get("partisan_tier_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        rows.append([f"Partisan: {tier}", _pct(count), "N/A†"])
+        u = _u_pct(count)
+        rows.append([f"Partisan: {tier}", _fmt_pct(u), "N/A†", "N/A†"])
         has_na = True
 
     for tier, count in sorted(
         summary.get("turnout_tier_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        rows.append([f"Turnout: {tier}", _pct(count), "N/A†"])
+        u = _u_pct(count)
+        rows.append([f"Turnout: {tier}", _fmt_pct(u), "N/A†", "N/A†"])
         has_na = True
 
     for cohort, count in sorted(
         summary.get("age_cohort_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        baseline = "N/A†"
-        has_na   = True
-        if "18-26" in cohort and total_vap > 0 and youth_vap > 0:
-            baseline = _baseline_pct(youth_vap, total_vap, "(target precincts)")
-        rows.append([f"Age: {cohort}", _pct(count), baseline])
+        u = _u_pct(count)
+        b = _b_pct(youth_vap, total_vap) if "18-26" in cohort else None
+        b_str = (f"{b:.1f}% (target precincts)") if b is not None else "N/A†"
+        rows.append([f"Age: {cohort}", _fmt_pct(u), b_str, _fmt_diff(u, b)])
+        if b is None:
+            has_na = True
 
     for race, count in sorted(
         summary.get("race_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        baseline = "N/A†"
-        has_na   = True
-        if ("Hispanic" in race or "Latino" in race) and total_cvap > 0 and hisp_pop > 0:
-            baseline = _baseline_pct(hisp_pop, total_cvap, "(target precincts)")
-        rows.append([f"Race: {race}", _pct(count), baseline])
+        u = _u_pct(count)
+        is_hisp = "Hispanic" in race or "Latino" in race
+        b = _b_pct(hisp_pop, total_cvap) if is_hisp else None
+        b_str = (f"{b:.1f}% (target precincts)") if b is not None else "N/A†"
+        rows.append([f"Race: {race}", _fmt_pct(u), b_str, _fmt_diff(u, b)])
+        if b is None:
+            has_na = True
 
     for gender, count in sorted(
         summary.get("gender_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        rows.append([f"Gender: {gender}", _pct(count), "N/A†"])
+        u = _u_pct(count)
+        rows.append([f"Gender: {gender}", _fmt_pct(u), "N/A†", "N/A†"])
         has_na = True
 
     if has_na and rows:
-        rows.append(["† Census CVAP does not provide this breakdown", "", ""])
+        rows.append(["† No comparable Census CVAP breakdown available", "", "", ""])
 
     return headers, rows
 
@@ -833,23 +848,35 @@ def _build_prompt(
     )
 
     # Voter File Analysis section — only emitted when voter file is in structured_data.
-    # The comparison table is injected programmatically in _write_docx(); the LLM writes
-    # only the interpretation paragraph (Part B).
+    # The comparison table (Our Universe % / District Baseline % / Difference) is injected
+    # programmatically in _write_docx(); the LLM writes the interpretation below the table.
     voter_file_section = (
         "\n## Voter File Analysis\n"
-        "A data comparison table (Our Universe vs District Baseline) will be inserted "
-        "programmatically above your text — do NOT reproduce table data in prose.\n"
-        "Write 2–3 paragraphs interpreting what the voter file universe composition means "
-        "strategically. For each dimension where the uploaded universe differs by more than "
-        "5 percentage points from any available district baseline, include a sentence "
-        "explaining the implication in plain English — e.g. 'Our universe skews "
-        "significantly younger than the district as a whole — X% of our list is 18-26 "
-        "versus Y% in the target precincts — reflecting a deliberate prioritization of "
-        "youth voters consistent with our targeting strategy.' If a dimension is broadly "
-        "representative, note it is well-matched rather than forcing a finding.\n"
-        "Write in first person plural ('our universe', 'our list', 'our program'). "
-        "Explain technical terms (partisan score, turnout propensity) in plain language "
-        "on first use — assume the reader is a campaign manager, not a data scientist."
+        "IMPORTANT: Use the exact figures from the VOTER FILE DATA block in this prompt — "
+        "do NOT invent or estimate numbers. A programmatic comparison table is inserted "
+        "above your prose — do NOT reproduce it as a table in your text.\n\n"
+        "Part A — Universe Composition (2–3 paragraphs, first person plural only):\n"
+        "Working through each dimension in the VOTER FILE DATA block — partisan tier, "
+        "turnout propensity, age cohort, race/ethnicity — compare our universe percentages "
+        "to the district baseline. For any dimension where our universe differs from the "
+        "district by more than 5 percentage points, state the specific percentages and "
+        "name the strategic implication in plain English: e.g. 'Our universe is 61% "
+        "Strong Democrat versus the district's estimated 43% Democratic registrant share — "
+        "our list skews heavily toward existing supporters, strengthening GOTV reach but "
+        "limiting persuasion coverage.' If a dimension is broadly representative, say so "
+        "explicitly rather than forcing a finding. Use 'our universe', 'our list', "
+        "'our program' — never 'the campaign's database' or 'this dataset'.\n\n"
+        "Part B — GOTV vs Persuasion Diagnosis (1 paragraph):\n"
+        "Using the partisan tier percentages from VOTER FILE DATA — cite "
+        "Strong Democrat %, Persuadable Democrat %, True Persuadable %, "
+        "Persuadable Republican %, and Strong Republican % by name — state whether our "
+        "universe favors a GOTV-heavy, persuasion-heavy, or integrated approach. "
+        "Connect this directly to the win number: if the Strong + Persuadable Democrat "
+        "share of our universe is enough to deliver the win number at expected turnout, "
+        "persuasion spending is supplemental; if it is not, persuasion investment is "
+        "required and the universe needs to be expanded toward True Persuadable voters. "
+        "Explain 'partisan score', 'turnout propensity tier', and 'True Persuadable' "
+        "in plain language on first use."
     ) if (has_voter_file and is_plan) else ""
 
     # Target Universe addendum based on voter file availability.
@@ -1480,6 +1507,10 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     finance_entry   = _get_entry(structured_data, "finance")
     vf_entry        = _get_entry(structured_data, "voter_file")
     precincts       = (precinct_entry or {}).get("precincts", [])
+    logger.info(
+        "ExportAgent _write_docx: finance_entry budget_scenarios=%s",
+        (finance_entry or {}).get("budget_scenarios"),
+    )
 
     # Open the branded template if it exists; fall back to a blank document.
     if os.path.exists(TEMPLATE_PATH):
@@ -1502,6 +1533,8 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     synthesis_for_docx = _strip_inline_paid_media(synthesis) if paid_media_plan else synthesis
 
     sections = _parse_sections(synthesis_for_docx)
+    logger.info("ExportAgent _write_docx: PLAN_SECTION_ORDER=%s", PLAN_SECTION_ORDER)
+    logger.info("ExportAgent _write_docx: LLM sections generated=%s", list(sections.keys()))
 
     # Use PLAN_SECTION_ORDER when this is a plan doc; otherwise use whatever the LLM produced.
     ordered_titles = (
@@ -1831,7 +1864,6 @@ def export_node(state: AgentState) -> dict:
     district_lbl = _district_label(structured_data)
 
     has_script_pack = any(d.get("agent") == "script_pack" for d in structured_data)
-    print(f"has_script_pack={has_script_pack}")  # TODO: remove after confirming script pack generation
     logger.info(
         f"has_script_pack: {has_script_pack}, "
         f"script pack agent found: {any(d.get('agent') == 'script_pack' for d in structured_data)}"

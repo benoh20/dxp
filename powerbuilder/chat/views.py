@@ -303,8 +303,6 @@ def send_message_view(request):
         logger.exception("Pipeline error: %s", exc)
         return render(request, "partials/message.html", {"error": f"Pipeline error: {exc}"})
 
-    print(f"[DEBUG] run_query keys={list(result.keys())} | generated_file_path={result.get('generated_file_path')}", flush=True)
-
     final_answer        = result.get("final_answer", "")
     active_agents       = result.get("active_agents", [])
     generated_file_path = result.get("generated_file_path")
