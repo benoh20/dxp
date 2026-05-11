@@ -611,15 +611,12 @@ def messaging_node(state: AgentState) -> dict:
     precincts_entry = next(
         (d for d in structured_data if d.get("agent") == "precincts"), None
     )
-    precincts     = precincts_entry.get("precincts", [])  if precincts_entry else []
-    district_id   = (precincts_entry or {}).get("district_id",   "unknown")
-    district_type = (precincts_entry or {}).get("district_type", "unknown")
+    precincts = precincts_entry.get("precincts", []) if precincts_entry else []
 
-    district_label = (
-        f"{district_type.replace('_', ' ').title()} {district_id}"
-        if district_id != "unknown"
-        else "target district"
-    )
+    # Use the same label formatter as export.py so scripts read 'AZ-06' not 'Congressional 0406'.
+    # Lazy import breaks the messaging → export module-level dependency.
+    from .export import _district_label as _fmt_district_label
+    district_label = _fmt_district_label(structured_data)
 
     if not precincts:
         logger.warning(
@@ -699,6 +696,17 @@ If the research does not support a talking point, omit it entirely.
 Every claim in your output must be directly traceable to a provided finding.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+━━━ VOTER CONTACT CONSTRAINT ━━━
+Do NOT name the opposing candidate in any direct voter contact script
+(canvassing_script, phone_script, text_script, mail_narrative).
+Use positive framing only — talk about what [INSERT CANDIDATE OR ORGANIZATION]
+supports and will do, not what the opponent has done or said.
+The canvass and phone opener must say "I'm a volunteer with [INSERT CANDIDATE OR
+ORGANIZATION]" — not a reference to the opposing candidate by name.
+Digital formats (digital_copy, meta_post, youtube_script, tiktok_script) may use
+implicit contrast framing but should still not name the opposing candidate.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 DEMOGRAPHIC PROFILE OF TARGET PRECINCTS:
 {demographic_summary}
 
@@ -711,8 +719,6 @@ RESEARCH FINDINGS (your only permitted source of messaging content):
 Generate all eight sections below. Each section must:
 1. Be grounded exclusively in the research findings above.
 2. Be tailored to the demographic profile of the target precincts.
-3. Close with this exact recency note in italics:
-   *Research sourced from materials dated as recently as {most_recent_date}.*
 
 You MUST include each section marker exactly as shown on its own line.
 Do not rename, reorder, or omit any marker.

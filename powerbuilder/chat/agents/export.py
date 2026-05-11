@@ -223,11 +223,13 @@ PLAN_SECTION_ORDER = [
     "District Background",
     "Contrast Research",
     "Target Universe and Demographics",
+    "Voter File Analysis",
     "Geographic Targeting",
     "Messaging Strategy",
     "Budget Estimate",
     "Win Number Calculation",
     "Program Recommendations",
+    "Timeline & Phases",
 ]
 
 # ---------------------------------------------------------------------------
@@ -471,6 +473,104 @@ def _budget_tables(finance_entry: dict) -> tuple:
     return unit_cost_table, fec_table
 
 
+def _budget_scenario_table(budget_scenarios: dict) -> tuple:
+    """
+    Build (headers, rows) for the three budget scenarios table.
+    Returns an empty rows list when budget_scenarios is falsy.
+    """
+    if not budget_scenarios:
+        return (["Scenario", "Total Budget", "Key Trade-offs"], [])
+    label_map = {"full": "Full (100%)", "mid": "Mid-Range (75%)", "small": "Lean (50%)"}
+    headers = ["Scenario", "Total Budget", "Key Trade-offs"]
+    rows = [
+        [
+            label_map.get(key, key.title()),
+            _fmt_money(info.get("total", 0)),
+            info.get("cuts", ""),
+        ]
+        for key, info in [
+            ("full",  budget_scenarios.get("full",  {})),
+            ("mid",   budget_scenarios.get("mid",   {})),
+            ("small", budget_scenarios.get("small", {})),
+        ]
+        if info
+    ]
+    return headers, rows
+
+
+def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple:
+    """
+    Build (headers, rows) comparing the voter file universe to the district CVAP baseline.
+
+    Dimensions with no Census equivalent (partisan tier, turnout tier, gender) show 'N/A†'.
+    Where precincts data allows a partial baseline (Hispanic %, Youth VAP %) it is used
+    with a note that figures are from the target precincts, not the full district.
+    """
+    summary = vf_entry.get("summary", {})
+    total   = max(summary.get("total_voters", 0), 1)  # avoid div/0
+
+    # Aggregate across target precincts for partial baselines
+    precincts_list = (_get_entry(structured_data, "precincts") or {}).get("precincts", [])
+    total_cvap = sum(float(p.get("total_cvap", 0) or 0) for p in precincts_list)
+    total_vap  = sum(float(p.get("total_vap",  0) or 0) for p in precincts_list)
+    hisp_pop   = sum(float(p.get("hispanic_pop", 0) or 0) for p in precincts_list)
+    youth_vap  = sum(float(p.get("youth_vap",   0) or 0) for p in precincts_list)
+
+    def _pct(count):
+        return f"{count / total * 100:.2f}%"
+
+    def _baseline_pct(numerator, denominator, note=""):
+        if denominator > 0 and numerator > 0:
+            label = f"{numerator / denominator * 100:.2f}%"
+            return f"{label} {note}".strip()
+        return "N/A†"
+
+    headers  = ["Dimension", "Our Universe", "District Baseline"]
+    rows: list[list[str]] = []
+    has_na   = False
+
+    for tier, count in sorted(
+        summary.get("partisan_tier_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        rows.append([f"Partisan: {tier}", _pct(count), "N/A†"])
+        has_na = True
+
+    for tier, count in sorted(
+        summary.get("turnout_tier_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        rows.append([f"Turnout: {tier}", _pct(count), "N/A†"])
+        has_na = True
+
+    for cohort, count in sorted(
+        summary.get("age_cohort_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        baseline = "N/A†"
+        has_na   = True
+        if "18-26" in cohort and total_vap > 0 and youth_vap > 0:
+            baseline = _baseline_pct(youth_vap, total_vap, "(target precincts)")
+        rows.append([f"Age: {cohort}", _pct(count), baseline])
+
+    for race, count in sorted(
+        summary.get("race_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        baseline = "N/A†"
+        has_na   = True
+        if ("Hispanic" in race or "Latino" in race) and total_cvap > 0 and hisp_pop > 0:
+            baseline = _baseline_pct(hisp_pop, total_cvap, "(target precincts)")
+        rows.append([f"Race: {race}", _pct(count), baseline])
+
+    for gender, count in sorted(
+        summary.get("gender_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        rows.append([f"Gender: {gender}", _pct(count), "N/A†"])
+        has_na = True
+
+    if has_na and rows:
+        rows.append(["† Census CVAP does not provide this breakdown", "", ""])
+
+    return headers, rows
+
+
 # ---------------------------------------------------------------------------
 # Synthesis (LLM)
 # ---------------------------------------------------------------------------
@@ -583,9 +683,50 @@ def _format_structured_for_prompt(structured_data: list) -> str:
             lines.append(f"  Top 5 targets: {', '.join(top_names)}")
         blocks.append("\n".join(lines))
 
+    vf = _get_entry(structured_data, "voter_file")
+    if vf:
+        summary = vf.get("summary", {})
+        total   = summary.get("total_voters", 0) or 0
+        vendor  = vf.get("vendor_detected", "Unknown")
+        lines   = [f"VOTER FILE DATA: {_fmt_int(total)} total voters | vendor: {vendor}"]
+
+        pt = summary.get("partisan_tier_breakdown", {})
+        if pt and total:
+            lines.append("  Partisan tier breakdown (% of voter file):")
+            for tier, count in sorted(pt.items(), key=lambda x: -x[1]):
+                lines.append(f"    {tier}: {_fmt_int(count)} ({count / total * 100:.1f}%)")
+
+        tt = summary.get("turnout_tier_breakdown", {})
+        if tt and total:
+            lines.append("  Turnout propensity breakdown:")
+            for tier, count in sorted(tt.items(), key=lambda x: -x[1]):
+                lines.append(f"    {tier}: {_fmt_int(count)} ({count / total * 100:.1f}%)")
+
+        ac = summary.get("age_cohort_breakdown", {})
+        if ac and total:
+            lines.append("  Age cohort breakdown:")
+            for cohort, count in sorted(ac.items(), key=lambda x: -x[1]):
+                lines.append(f"    {cohort}: {_fmt_int(count)} ({count / total * 100:.1f}%)")
+
+        race = summary.get("race_breakdown", {})
+        if race and total:
+            lines.append("  Race/ethnicity breakdown:")
+            for r, count in sorted(race.items(), key=lambda x: -x[1]):
+                lines.append(f"    {r}: {_fmt_int(count)} ({count / total * 100:.1f}%)")
+
+        if summary.get("avg_partisan_score") is not None:
+            lines.append(f"  Average partisan score: {summary['avg_partisan_score']:.1f}/100")
+        if summary.get("avg_turnout_score") is not None:
+            lines.append(f"  Average turnout score: {summary['avg_turnout_score']:.1f}/100")
+        if summary.get("new_registrants") and total:
+            nr = summary["new_registrants"]
+            lines.append(f"  New registrants: {_fmt_int(nr)} ({nr / total * 100:.1f}%)")
+
+        blocks.append("\n".join(lines))
+
     # Pass through any unrecognised agent entries as flat key-value pairs so nothing
     # is silently dropped when new agents are added.
-    known = {"win_number", "finance", "election_results", "precincts", "power_type"}
+    known = {"win_number", "finance", "election_results", "precincts", "power_type", "voter_file"}
     for entry in structured_data:
         agent = entry.get("agent", "")
         if agent not in known:
@@ -658,7 +799,10 @@ def _build_prompt(
 
     # Signal: contrast research findings present when the American Bridge header appears.
     has_contrast_research = "American Bridge Research Books" in research_context
-    has_precincts = _get_entry(structured_data, "precincts") is not None
+    has_precincts        = _get_entry(structured_data, "precincts")   is not None
+    has_voter_file       = _get_entry(structured_data, "voter_file")  is not None
+    _finance_entry_bp    = _get_entry(structured_data, "finance")
+    has_budget_scenarios = bool((_finance_entry_bp or {}).get("budget_scenarios"))
 
     # Injected between District Background and Target Universe for electoral plans.
     contrast_research_section = (
@@ -687,6 +831,55 @@ def _build_prompt(
         "Precinct-level targeting data was not available for this district — state this "
         "explicitly rather than writing generic geographic descriptions."
     )
+
+    # Voter File Analysis section — only emitted when voter file is in structured_data.
+    # The comparison table is injected programmatically in _write_docx(); the LLM writes
+    # only the interpretation paragraph (Part B).
+    voter_file_section = (
+        "\n## Voter File Analysis\n"
+        "A data comparison table (Our Universe vs District Baseline) will be inserted "
+        "programmatically above your text — do NOT reproduce table data in prose.\n"
+        "Write 2–3 paragraphs interpreting what the voter file universe composition means "
+        "strategically. For each dimension where the uploaded universe differs by more than "
+        "5 percentage points from any available district baseline, include a sentence "
+        "explaining the implication in plain English — e.g. 'Our universe skews "
+        "significantly younger than the district as a whole — X% of our list is 18-26 "
+        "versus Y% in the target precincts — reflecting a deliberate prioritization of "
+        "youth voters consistent with our targeting strategy.' If a dimension is broadly "
+        "representative, note it is well-matched rather than forcing a finding.\n"
+        "Write in first person plural ('our universe', 'our list', 'our program'). "
+        "Explain technical terms (partisan score, turnout propensity) in plain language "
+        "on first use — assume the reader is a campaign manager, not a data scientist."
+    ) if (has_voter_file and is_plan) else ""
+
+    # Target Universe addendum based on voter file availability.
+    target_universe_vf_note = (
+        "When voter file data is present (see VOTER FILE DATA in the structured context), "
+        "reference the actual uploaded universe size and partisan composition alongside the "
+        "CVAP estimates. Note how the uploaded universe compares to the full persuadable "
+        "universe from win_number — is it a subset, and if so what does that imply about "
+        "targeting priorities? Use first person plural ('our universe', 'our list')."
+    ) if has_voter_file else (
+        "Note at the end of this section: 'These figures are drawn from Census estimates "
+        "for the district — uploading a voter file will allow Powerbuilder to compare your "
+        "actual universe against these baselines.'"
+    )
+
+    # Budget Estimate addendum for voter file context.
+    budget_vf_note = (
+        "\nWhen a voter file is present, show contact costs for the actual uploaded "
+        "universe size alongside the full persuadable universe estimate so the reader "
+        "can see the cost difference between our current list and the full target universe."
+    ) if has_voter_file else ""
+
+    # Budget Estimate addendum for scenario planning.
+    budget_scenario_note = (
+        "\nThree budget scenarios (Full/Mid/Lean) will be shown in a table after your "
+        "narrative. Reference the scenario trade-offs in your narrative: name which voter "
+        "contact tactics would be reduced or eliminated at mid-range (75%) and lean (50%) "
+        "funding levels, and explain the strategic implication — e.g. how many fewer doors "
+        "get knocked or calls get made, and what that means for reaching the win number."
+    ) if has_budget_scenarios else ""
 
     # Injected into the Messaging Strategy section when contrast research is present.
     contrast_messaging_note = (
@@ -824,7 +1017,8 @@ Write with specific numbers — do not produce generic boilerplate. Include all 
 Summarise the demographic patterns across the target precincts in narrative form —
 age, race/ethnicity, CVAP composition, and voter registration trends.
 Do not reproduce raw numbers in a table — the precinct table will be inserted after this section.
-
+{target_universe_vf_note}
+{voter_file_section}
 ## Geographic Targeting
 Describe the logic behind the target precinct selection and how geographic
 concentration serves the win-number goal. {precinct_instruction}
@@ -835,7 +1029,7 @@ concentration serves the win-number goal. {precinct_instruction}
 ## Budget Estimate
 Narrative interpretation of the budget analysis. If a specific budget was provided,
 discuss what program it funds and what trade-offs were made. Do not reproduce tables —
-they will be inserted after this section.
+they will be inserted after this section.{budget_vf_note}{budget_scenario_note}
 
 ## Win Number Calculation
 Open with the exact win number from WIN NUMBER DATA above, e.g.
@@ -847,6 +1041,35 @@ Do not reproduce numbers in a table — the win number table will be inserted he
 
 ## Program Recommendations
 {recommendations_note}
+
+## Timeline & Phases
+Produce a six-phase campaign timeline grounded in the specific context of {district_label}.
+Use exactly these H3 headers — do not rename or reorder them:
+
+### Phase 1 — Planning & Infrastructure (6+ months before Election Day)
+### Phase 2 — Deep Canvassing & Early Organizing (4–6 months before Election Day)
+### Phase 3 — Early Persuasion & Summer Hiring (2–4 months before Election Day)
+### Phase 4 — Persuasion (6 weeks – 2 months before Election Day)
+### Phase 5 — Late Persuasion & Spread Out the Vote (2–4 weeks before Election Day)
+### Phase 6 — GOTV (Final week through Election Day)
+
+For each phase include three bullet groups:
+- **Primary focus** — the strategic priority for this phase
+- **Active voter contact tactics** — which field channels are running and at what intensity
+- **Key milestones** — 3–5 concrete deliverables or decision points the campaign must hit
+
+Ground each phase in this specific district: reference the target demographic and key issues by
+name in the phase descriptions — do not write generic text that could apply to any campaign.
+
+Date rules (apply exactly as written):
+- The general election is the first Tuesday in November of the election year — state this
+  date explicitly in Phase 6 using the target_year from ELECTION RESULTS DATA if available.
+- Include this placeholder in Phase 3 (primary timing is set by state law):
+  [FILL IN: Add your state's primary date — primary timing varies significantly by state]
+- Include this placeholder in Phase 4 (mail-in ballot drop date is set by state law):
+  [FILL IN: Add the date mail-in ballots are sent to voters in your state]
+- Include this placeholder in Phase 5 (early voting window is set by state law):
+  [FILL IN: Add your state's early voting start date]
 
 Then end with (italicised):
 {_ATTRIBUTION}
@@ -1255,6 +1478,7 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     win_entry       = _get_entry(structured_data, "win_number")
     precinct_entry  = _get_entry(structured_data, "precincts")
     finance_entry   = _get_entry(structured_data, "finance")
+    vf_entry        = _get_entry(structured_data, "voter_file")
     precincts       = (precinct_entry or {}).get("precincts", [])
 
     # Open the branded template if it exists; fall back to a blank document.
@@ -1287,16 +1511,29 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     )
 
     for title in ordered_titles:
+        # Voter File Analysis: skip entirely when no voter file was uploaded.
+        if "Voter File" in title and not vf_entry:
+            continue
+
         section_text = sections.get(title, "")
         # Skip optional sections the LLM didn't generate (e.g. "Contrast Research" when
         # no contrast research data was available). Always render sections that receive
         # programmatic table injections, even when the LLM wrote no prose for them.
         has_table_injection = (
             "Win Number" in title or "Geographic" in title or "Budget" in title
+            or "Voter File" in title
         )
         if not section_text and not has_table_injection:
             continue
         doc.add_heading(title, level=2)
+
+        # Voter File Analysis: inject comparison table BEFORE prose (Part A then Part B).
+        if "Voter File" in title and vf_entry:
+            vf_h, vf_r = _voter_file_comparison_table(vf_entry, structured_data)
+            if vf_r:
+                doc.add_heading("Universe Composition vs District Baseline", level=3)
+                _add_table(doc, vf_h, vf_r)
+
         if section_text:
             _add_prose(doc, section_text)
 
@@ -1336,6 +1573,12 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
                     _add_table(doc, *fec)
                 if paid_media_plan:
                     _render_paid_media_section(doc, paid_media_plan)
+                budget_scenarios = finance_entry.get("budget_scenarios")
+                if budget_scenarios:
+                    doc.add_heading("Budget Scenario Planning", level=3)
+                    sc_h, sc_r = _budget_scenario_table(budget_scenarios)
+                    if sc_r:
+                        _add_table(doc, sc_h, sc_r)
             else:
                 available = [d.get("agent") for d in structured_data]
                 logger.warning(

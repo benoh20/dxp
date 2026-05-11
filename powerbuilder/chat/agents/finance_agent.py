@@ -351,6 +351,54 @@ def _build_budget_program(budget: float, unit_costs: dict) -> dict:
     return program
 
 
+def _build_budget_scenarios(budget: float, unit_costs: dict) -> dict:
+    """
+    Compute three planning scenarios at 100%, 75%, and 50% of the full budget.
+    Each entry contains total, description, and cuts (human-readable trade-offs).
+    """
+    full_total  = round(budget, 2)
+    mid_total   = round(budget * 0.75, 2)
+    small_total = round(budget * 0.50, 2)
+
+    full_prog = _build_budget_program(full_total, unit_costs)
+    mid_prog  = _build_budget_program(mid_total,  unit_costs)
+
+    # Compute reduction counts for the mid scenario cuts description.
+    def _contacts(prog, tactic):
+        return prog.get(tactic, {}).get("contacts", 0)
+
+    mail_cut    = _contacts(full_prog, "mail_piece")  - _contacts(mid_prog, "mail_piece")
+    phone_cut   = _contacts(full_prog, "phone_call")  - _contacts(mid_prog, "phone_call")
+    digital_cut = _contacts(full_prog, "digital")     - _contacts(mid_prog, "digital")
+
+    mid_cuts_parts = []
+    if mail_cut > 0:
+        mid_cuts_parts.append(f"mail reduced by ~{mail_cut:,} pieces")
+    if phone_cut > 0:
+        mid_cuts_parts.append(f"phone banking reduced by ~{phone_cut:,} calls")
+    if digital_cut > 0:
+        mid_cuts_parts.append(f"digital reduced by ~{digital_cut:,} impressions")
+    mid_cuts = ("; ".join(mid_cuts_parts) + ". Canvassing maintained.") if mid_cuts_parts else "Proportional reduction across all tactics."
+
+    return {
+        "full": {
+            "total":       full_total,
+            "description": "Full program — all tactics at full allocation",
+            "cuts":        "No reductions. Full canvassing, phone, text, mail, and digital program.",
+        },
+        "mid": {
+            "total":       mid_total,
+            "description": "Mid-range plan at 75% of full budget",
+            "cuts":        mid_cuts,
+        },
+        "small": {
+            "total":       small_total,
+            "description": "Lean plan at 50% of full budget",
+            "cuts":        "Mail eliminated entirely. Digital spend halved. Phone banking significantly reduced. Canvassing prioritized as primary contact method.",
+        },
+    }
+
+
 def _build_voter_file_budget(universe_size: int, unit_costs: dict) -> dict:
     """
     Cost to contact the full voter file universe once per tactic.
@@ -870,8 +918,10 @@ BUDGET: [number or NONE]
     # 5. Build budget-constrained program if a budget was provided
     # -----------------------------------------------------------------------
     budget_program: Optional[dict] = None
+    budget_scenarios: Optional[dict] = None
     if budget_available is not None:
-        budget_program = _build_budget_program(budget_available, unit_costs)
+        budget_program   = _build_budget_program(budget_available, unit_costs)
+        budget_scenarios = _build_budget_scenarios(budget_available, unit_costs)
 
     # -----------------------------------------------------------------------
     # 6. Build human-readable district label
@@ -958,6 +1008,7 @@ BUDGET: [number or NONE]
             **(category_breakdown or {}),
         } if fec_result and fec_result.get("avg_disbursements") else None,
         "budget_program":     budget_program,
+        "budget_scenarios":   budget_scenarios,
         "fec_candidates_sampled": fec_result.get("candidates_sampled", 0) if fec_result else 0,
         "data_source": (
             "fec" if mode == "historical"
