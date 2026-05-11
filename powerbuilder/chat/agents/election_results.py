@@ -39,8 +39,8 @@ from langchain_openai import ChatOpenAI
 from .state import AgentState
 from .win_number import get_climate_years
 from ..utils.cook_client import CookPoliticalClient
-from ..utils.district_standardizer import GeographyStandardizer
-from ..utils.election_ingestor import AT_LARGE_ALIASES, ElectionDataUtility
+from ..utils.district_standardizer import GeographyStandardizer, normalize_district
+from ..utils.election_ingestor import ElectionDataUtility
 from ..utils.storage import read_dataframe, write_dataframe
 
 logger = logging.getLogger(__name__)
@@ -141,11 +141,11 @@ def _extract_party_margins(
         return None
 
     # For congressional: filter by district number extracted from GEOID.
-    # MEDSL constituency-returns stores at-large districts as 0 (integer); normalise
-    # to 1 before filtering so that single-district states match our convention.
+    # normalize_district strips the state prefix and maps at-large aliases → 1.
+    # MEDSL stores at-large as 0; replace in the DataFrame before filtering.
     if office_type == "congressional":
         try:
-            dist_num = int(district_id[len(state_fips):])
+            dist_num = normalize_district(district_id, state_fips=state_fips)
         except (ValueError, IndexError):
             return None
         df["district"] = df["district"].replace({0: 1})
@@ -317,14 +317,11 @@ TARGET_YEAR: [4-digit election year, default 2026]
         district_id = "statewide"
     else:
         dist_num_raw = params.get("DISTRICT_NUM", "0")
-        if dist_num_raw in AT_LARGE_ALIASES or str(dist_num_raw) in AT_LARGE_ALIASES:
-            dist_num = 1
-        else:
-            try:
-                dist_num = int(dist_num_raw)
-            except (ValueError, TypeError):
-                logger.error("ElectionAnalyst: could not parse district number from LLM output")
-                return None
+        try:
+            dist_num = normalize_district(dist_num_raw)
+        except ValueError:
+            logger.error("ElectionAnalyst: could not parse district number from LLM output")
+            return None
         geoid = GeographyStandardizer.convert_to_geoid(state_name, dist_num, district_type)
         if isinstance(geoid, dict):
             logger.error(f"ElectionAnalyst: GEOID conversion failed — {geoid.get('error')}")

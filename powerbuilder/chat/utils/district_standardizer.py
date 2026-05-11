@@ -1,5 +1,63 @@
 import re
-from .election_ingestor import AT_LARGE_ALIASES
+
+# ---------------------------------------------------------------------------
+# At-large district normalization
+# ---------------------------------------------------------------------------
+
+# Canonical aliases that all mean "this state has one at-large representative".
+# Covers MEDSL ("ZZ", 0), Census API ("ZZ"), user queries ("at-large"), and
+# common zero-padded strings ("00", "000", "0000").  Zero is also handled
+# numerically in normalize_district so the set only needs the string forms.
+_AT_LARGE_TOKENS: frozenset = frozenset({
+    "zz", "al", "at-large", "at large", "at_large", "atlarge",
+})
+
+
+def normalize_district(district_id, state_fips=None) -> int:
+    """
+    Normalize any district identifier to a plain integer district number.
+
+    Handles every form that appears across MEDSL data, Census API responses,
+    election ingestor records, and user queries:
+
+      At-large aliases  → 1
+        'ZZ', 'AL', 'at-large', 'at large', 'AT-LARGE', 'AT LARGE'
+      Zero values       → 1  (at-large convention used by MEDSL)
+        0, '0', '00', '000', '0000'
+      Zero-padded       → stripped integer
+        '01' → 1,  '06' → 6
+      GEOID format      → district number  (requires state_fips)
+        '0406' with state_fips='04' → 6
+      Plain integer     → itself
+        6 → 6
+
+    Raises ValueError for inputs that cannot be interpreted as a district number.
+    """
+    # Fast path for plain integers
+    if isinstance(district_id, int):
+        return 1 if district_id == 0 else district_id
+
+    s = str(district_id).strip()
+
+    # At-large text aliases (case-insensitive)
+    if s.lower() in _AT_LARGE_TOKENS:
+        return 1
+
+    # GEOID format: "SSDD" (4 chars) where SS = state_fips, DD = district
+    # Strip the state prefix so "0406" with state_fips "04" → "06" → 6.
+    if state_fips is not None:
+        prefix = str(state_fips).zfill(2)
+        if len(s) == len(prefix) + 2 and s.startswith(prefix):
+            s = s[len(prefix):]
+
+    try:
+        n = int(s)
+        return 1 if n == 0 else n
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"normalize_district: cannot interpret {district_id!r} as a district number"
+        )
+
 
 class GeographyStandardizer:
     """
@@ -72,10 +130,12 @@ class GeographyStandardizer:
         if not state_code:
             return {"error": f"State '{state_name}' not recognized."}
 
-        # Normalise at-large aliases (ZZ, AL, "at-large", 0, …) to 1 so that
-        # single-district states always produce a valid GEOID like "0201".
-        if district_num in AT_LARGE_ALIASES or str(district_num) in AT_LARGE_ALIASES:
-            district_num = 1
+        # Normalise any at-large alias or zero value to 1 so that single-district
+        # states always produce a valid GEOID like "0201".
+        try:
+            district_num = normalize_district(district_num, state_fips=state_code)
+        except ValueError:
+            return {"error": f"District identifier {district_num!r} could not be normalized."}
 
         dist_padded = str(district_num).zfill(2) # '7' -> '07'
 

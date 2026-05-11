@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from ..utils.census_vars import VOTER_DEMOGRAPHICS, MULTI_VAR_METRICS, TRACT_ONLY_METRICS
 from ..utils.data_fetcher import DataFetcher
-from ..utils.district_standardizer import GeographyStandardizer
+from ..utils.district_standardizer import GeographyStandardizer, normalize_district
 from ..utils.storage import file_exists, read_dataframe
 from .state import AgentState
 
@@ -755,8 +755,11 @@ class PrecinctsAgent:
         try:
             crosswalk = read_dataframe(crosswalk_path, dtype={"bg_geoid": str})
         except FileNotFoundError:
-            return {"error": f"Crosswalk missing for state {state_fips}. "
-                             "Run crosswalk_builder.build_crosswalk() first."}
+            return {"coverage_note": (
+                f"No crosswalk file found for state {state_fips} "
+                f"(tried {district_crosswalk} and {state_crosswalk}). "
+                "Run crosswalk_builder.build_crosswalk() to add coverage for this district."
+            )}
 
         # Normalise official_boundary to bool (CSV reads it as string)
         crosswalk["official_boundary"] = (
@@ -1024,10 +1027,10 @@ TOP_N: [integer number of precincts to return, default 20]
             combined_primary_metrics = None  # single intent: no synthetic combined column needed
 
         try:
-            dist_num = int(params.get("DISTRICT_NUM", 0))
+            dist_num = normalize_district(params.get("DISTRICT_NUM", 0))
             top_n    = int(params.get("TOP_N", 20))
         except ValueError:
-            dist_num = 0
+            dist_num = 1  # default to at-large on unrecognizable input
             top_n    = 20
 
         # Build GEOID for the target district
@@ -1042,6 +1045,31 @@ TOP_N: [integer number of precincts to return, default 20]
             state_fips, geoid, district_type, metrics, top_n,
             combined_primary_metrics=combined_primary_metrics,
         )
+
+        # Coverage-miss path: crosswalk file doesn't exist yet for this district.
+        # Return a non-fatal structured entry so the rest of the pipeline continues.
+        if "coverage_note" in output:
+            logger.warning(
+                "PrecinctsAgent: no crosswalk for %s — returning empty precincts entry. %s",
+                geoid, output["coverage_note"],
+            )
+            return {
+                "structured_data": [{
+                    "agent":         "precincts",
+                    "state_fips":    state_fips,
+                    "district_type": district_type,
+                    "district_id":   geoid,
+                    "precincts":     [],
+                    "precinct_count": 0,
+                    "coverage_note": output["coverage_note"],
+                }],
+                "errors": [
+                    "Precinct-level targeting is not available for this district yet — "
+                    "win number, research, opposition research, and messaging are still available. "
+                    "Contact us to request crosswalk coverage for this district."
+                ],
+                "active_agents": ["precincts"],
+            }
 
         # Error path: get_top_precincts returns {"error": "..."} on failure
         if "error" in output:

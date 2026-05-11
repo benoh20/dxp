@@ -7,13 +7,20 @@ load_dotenv()
 import pandas as pd
 from langchain_openai import ChatOpenAI
 from ..utils.data_fetcher import DataFetcher
-from ..utils.district_standardizer import GeographyStandardizer
+from ..utils.district_standardizer import GeographyStandardizer, normalize_district
 from ..utils.census_vars import VOTER_DEMOGRAPHICS
-from ..utils.election_ingestor import AT_LARGE_ALIASES
 from ..utils.storage import read_dataframe
 from .state import AgentState
 
 CVAP_KEY = VOTER_DEMOGRAPHICS.get("total_cvap", "B29001_001E")
+
+
+def _is_at_large_census_code(code) -> bool:
+    """Return True when a Census district code represents an at-large district."""
+    try:
+        return normalize_district(code) == 1
+    except ValueError:
+        return False
 
 
 def get_climate_years(target_year: int) -> tuple:
@@ -98,15 +105,14 @@ class WinNumberAgent:
                 None
             )
             # At-large states (AK, WY, VT, DE, ND, SD, MT): the Census API returns
-            # "ZZ" or another AT_LARGE_ALIASES value instead of a numeric district
-            # code. dist_code will be "01" after normalisation, so try alias matching
-            # as a fallback when the direct lookup fails for district 1.
+            # "ZZ" instead of a numeric district code. dist_code will be "01" after
+            # normalisation, so try normalizing each Census row's code as a fallback
+            # when the direct lookup fails for district 1.
             if matched is None and dist_code.lstrip("0") in ("", "1"):
-                _al_upper = {str(a).upper() for a in AT_LARGE_ALIASES}
                 matched = next(
                     (d for d in census_data
                      if "error" not in d
-                     and str(d.get(census_geo_key, "")).upper() in _al_upper),
+                     and _is_at_large_census_code(d.get(census_geo_key, ""))),
                     None,
                 )
             if matched is None:
@@ -303,16 +309,13 @@ VICTORY_MARGIN: [decimal win threshold e.g. 0.52, default 0.52]
                 district_id = "statewide"
             else:
                 dist_num_raw = params.get("DISTRICT_NUM", "0")
-                if dist_num_raw in AT_LARGE_ALIASES or str(dist_num_raw) in AT_LARGE_ALIASES:
-                    dist_num = 1
-                else:
-                    try:
-                        dist_num = int(dist_num_raw)
-                    except (ValueError, TypeError):
-                        return {
-                            "errors":        [f"WinNumberAgent: Could not parse district number from '{dist_num_raw}'."],
-                            "active_agents": ["win_number"],
-                        }
+                try:
+                    dist_num = normalize_district(dist_num_raw)
+                except ValueError:
+                    return {
+                        "errors":        [f"WinNumberAgent: Could not parse district number from '{dist_num_raw}'."],
+                        "active_agents": ["win_number"],
+                    }
                 geoid = GeographyStandardizer.convert_to_geoid(state_name, dist_num, district_type)
                 if isinstance(geoid, dict):
                     return {

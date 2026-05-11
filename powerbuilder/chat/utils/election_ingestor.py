@@ -4,7 +4,8 @@ import pandas as pd
 import os
 from .data_fetcher import DataFetcher
 from .census_vars import VOTER_DEMOGRAPHICS
-from .storage import file_exists, read_dataframe, write_dataframe
+from .district_standardizer import normalize_district
+from .storage import STORAGE_BACKEND, file_exists, read_dataframe, write_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,8 @@ CVAP_KEY = VOTER_DEMOGRAPHICS.get("total_cvap", "B29001_001E")
 # All pd.read_csv() calls that download from MEDSL_URLS must use this encoding.
 MEDSL_ENCODING = "latin-1"
 
-# At-large district aliases used by various data sources for states with a single
-# congressional district (AK, WY, VT, DE, ND, SD, MT).  Any value in this set
-# must be normalised to the integer 1 before processing.
+# Kept for backwards compatibility — importing modules may reference this set.
+# New code should call normalize_district() instead.
 AT_LARGE_ALIASES = {"ZZ", "AL", "at-large", "at large", "AT-LARGE", "AT LARGE", "0", 0}
 
 class ElectionDataUtility:
@@ -54,15 +54,11 @@ class ElectionDataUtility:
                 if "error" in row:
                     continue
                 # Census returns zero-padded strings e.g. "07", or "ZZ" for at-large districts.
-                # Normalise any AT_LARGE_ALIASES value to 1 (single at-large district).
                 raw_district = row.get("congressional district", "0")
-                if raw_district in AT_LARGE_ALIASES or str(raw_district).upper() in {str(a).upper() for a in AT_LARGE_ALIASES}:
-                    dist_num = 1  # at-large district (AK, WY, VT, DE, ND, SD, MT)
-                else:
-                    try:
-                        dist_num = int(raw_district)
-                    except (ValueError, TypeError):
-                        continue  # skip genuinely unrecognizable district values
+                try:
+                    dist_num = normalize_district(raw_district)
+                except ValueError:
+                    continue  # skip genuinely unrecognizable district values
                 lookup[dist_num] = float(row.get(CVAP_KEY, 0))
             return lookup
 
@@ -75,14 +71,10 @@ class ElectionDataUtility:
         """
         if office_type == "senate":
             return "statewide"
-        # Normalise at-large aliases to district 1 before building the GEOID.
-        # Covers MEDSL values like 0, "ZZ", "AL", "at-large" for single-district states.
-        if district_val in AT_LARGE_ALIASES or str(district_val) in AT_LARGE_ALIASES:
-            return f"{fips_str}01"
         try:
-            dist_num = int(district_val)
+            dist_num = normalize_district(district_val)
             return f"{fips_str}{dist_num:02d}"
-        except (ValueError, TypeError):
+        except ValueError:
             return str(district_val)
 
     @staticmethod
@@ -152,16 +144,28 @@ class ElectionDataUtility:
             # 1. Fetch MEDSL constituency-returns
             # House: prefer the local .tab file (comma-delimited despite the .tab extension)
             # to avoid a large remote download. Fall back to the remote URL when absent.
+            # On S3: skip file_exists() check (S3 HEAD is the authoritative source) and go
+            # directly to read_dataframe(), which routes to S3. On local: try file first,
+            # then fall back to URL download; catch UnicodeDecodeError and re-try via
+            # read_dataframe() (which may have a local cached copy with correct encoding).
             _house_local = "data/election_results/house_master_raw.tab"
-            if file_exists(_house_local):
+            if STORAGE_BACKEND == "s3" or file_exists(_house_local):
                 house_df = read_dataframe(_house_local, low_memory=False, encoding=MEDSL_ENCODING)
             else:
-                house_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["house"], low_memory=False, encoding=MEDSL_ENCODING)
+                try:
+                    house_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["house"], low_memory=False, encoding=MEDSL_ENCODING)
+                except UnicodeDecodeError as e:
+                    logger.warning("MEDSL download failed (house) — %s; falling back to read_dataframe.", e)
+                    house_df = read_dataframe(_house_local, low_memory=False, encoding=MEDSL_ENCODING)
             _senate_local = "data/election_results/senate_master_raw.csv"
-            if file_exists(_senate_local):
+            if STORAGE_BACKEND == "s3" or file_exists(_senate_local):
                 senate_df = read_dataframe(_senate_local, low_memory=False, encoding=MEDSL_ENCODING)
             else:
-                senate_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["senate"], low_memory=False, encoding=MEDSL_ENCODING)
+                try:
+                    senate_df = pd.read_csv(ElectionDataUtility.MEDSL_URLS["senate"], low_memory=False, encoding=MEDSL_ENCODING)
+                except UnicodeDecodeError as e:
+                    logger.warning("MEDSL download failed (senate) — %s; falling back to read_dataframe.", e)
+                    senate_df = read_dataframe(_senate_local, low_memory=False, encoding=MEDSL_ENCODING)
 
             # 2. General elections only (exclude primaries, runoffs), total votes only
             # (mode == "TOTAL" drops rows broken out by absentee/election-day/etc. that

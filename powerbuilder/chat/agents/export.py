@@ -814,7 +814,9 @@ def _build_prompt(
 
     # Signal: contrast research findings present when the American Bridge header appears.
     has_contrast_research = "American Bridge Research Books" in research_context
-    has_precincts        = _get_entry(structured_data, "precincts")   is not None
+    _precincts_entry_bp  = _get_entry(structured_data, "precincts")
+    has_precincts        = bool((_precincts_entry_bp or {}).get("precincts"))
+    has_coverage_note    = bool((_precincts_entry_bp or {}).get("coverage_note"))
     has_voter_file       = _get_entry(structured_data, "voter_file")  is not None
     _finance_entry_bp    = _get_entry(structured_data, "finance")
     has_budget_scenarios = bool((_finance_entry_bp or {}).get("budget_scenarios"))
@@ -830,22 +832,32 @@ def _build_prompt(
     ) if (has_contrast_research and is_electoral and is_plan) else ""
 
     # Injected into the Geographic Targeting section.
-    precinct_instruction = (
-        "Present the target precincts as three priority tiers based on target demographic "
-        "concentration. Use the specific precinct names and demographic figures from "
-        "PRECINCT DATA — do not use generic descriptions like 'urban centers' or 'suburban areas'.\n"
-        "- **Tier 1** (top 5 precincts by target demographic concentration): highest priority "
-        "for door knocking and direct voter contact. Name each precinct and cite its target "
-        "demographic figure.\n"
-        "- **Tier 2** (next 10 precincts): priority for phone banking and text messaging. "
-        "Name the precincts and briefly note the concentration level.\n"
-        "- **Tier 3** (remaining precincts): mail and digital only. Describe collectively.\n"
-        "For each tier explain the strategic logic — why this contact intensity given the "
-        "demographic concentration and win-number requirements."
-    ) if has_precincts else (
-        "Precinct-level targeting data was not available for this district — state this "
-        "explicitly rather than writing generic geographic descriptions."
-    )
+    if has_coverage_note:
+        precinct_instruction = (
+            "Precinct-level targeting data is not yet available for this district. "
+            "State this clearly in one sentence, then confirm that the win number, "
+            "research findings, and messaging strategy in this plan are fully actionable "
+            "without it. Do not write generic geographic descriptions."
+        )
+    elif has_precincts:
+        precinct_instruction = (
+            "Present the target precincts as three priority tiers based on target demographic "
+            "concentration. Use the specific precinct names and demographic figures from "
+            "PRECINCT DATA — do not use generic descriptions like 'urban centers' or 'suburban areas'.\n"
+            "- **Tier 1** (top 5 precincts by target demographic concentration): highest priority "
+            "for door knocking and direct voter contact. Name each precinct and cite its target "
+            "demographic figure.\n"
+            "- **Tier 2** (next 10 precincts): priority for phone banking and text messaging. "
+            "Name the precincts and briefly note the concentration level.\n"
+            "- **Tier 3** (remaining precincts): mail and digital only. Describe collectively.\n"
+            "For each tier explain the strategic logic — why this contact intensity given the "
+            "demographic concentration and win-number requirements."
+        )
+    else:
+        precinct_instruction = (
+            "Precinct-level targeting data was not available for this district — state this "
+            "explicitly rather than writing generic geographic descriptions."
+        )
 
     # Voter File Analysis section — only emitted when voter file is in structured_data.
     # The comparison table (Our Universe % / District Baseline % / Difference) is injected
@@ -1583,7 +1595,15 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
                 )
 
         elif "Geographic" in title:
-            if precincts:
+            coverage_note = (precinct_entry or {}).get("coverage_note")
+            if coverage_note:
+                _add_prose(doc,
+                    "Precinct-level targeting data is not yet available for this district. "
+                    "The win number, research findings, and messaging strategy above are "
+                    "still fully actionable."
+                )
+                logger.info("ExportAgent: Geographic Targeting — coverage_note present, rendered fallback prose.")
+            elif precincts:
                 doc.add_heading(f"Top {len(precincts)} Target Precincts", level=3)
                 h, r = _precinct_table(precincts)
                 _add_table(doc, h, r)
