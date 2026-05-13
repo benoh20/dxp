@@ -498,34 +498,67 @@ def _budget_scenario_table(budget_scenarios: dict) -> tuple:
     return headers, rows
 
 
-def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple:
+def _voter_file_partisanship_table(vf_entry: dict) -> tuple:
     """
-    Build (headers, rows) comparing the voter file universe to the district CVAP baseline.
-
-    Columns: Dimension | Our Universe % | District Baseline % | Difference (pp)
-    Dimensions with no Census equivalent (partisan tier, turnout tier, gender) show 'N/A†'.
-    Where precincts data allows a partial baseline (Hispanic %, Youth VAP %) it is included
-    with a note that figures are from the target precincts, not the full district.
+    Part A: Partisan tier + turnout propensity breakdown.
+    Columns: Tier | Count | % of Universe
+    No district baseline — this table stands alone (no Census equivalent exists).
     """
     summary = vf_entry.get("summary", {})
-    total   = max(summary.get("total_voters", 0), 1)  # avoid div/0
+    total   = max(summary.get("total_voters", 0), 1)
+    headers = ["Tier", "Count", "% of Universe"]
+    rows: list[list[str]] = []
 
-    # Aggregate across target precincts for partial baselines
+    for tier, count in sorted(
+        summary.get("partisan_tier_breakdown", {}).items(), key=lambda x: -x[1]
+    ):
+        rows.append([tier, _fmt_int(count), f"{count / total * 100:.1f}%"])
+
+    turnout_data = summary.get("turnout_tier_breakdown", {})
+    if turnout_data:
+        if rows:
+            rows.append(["—", "—", "—"])
+        for tier, count in sorted(turnout_data.items(), key=lambda x: -x[1]):
+            rows.append([f"Turnout: {tier}", _fmt_int(count), f"{count / total * 100:.1f}%"])
+
+    return headers, rows
+
+
+def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple:
+    """
+    Part B: Age and Race rows compared against district-level baselines derived from
+    precincts structured_data (target precinct aggregates, not full-district Census).
+
+    Baseline derivation — only available when the relevant demographic field was
+    included in the precinct targeting query:
+      hispanic_pop          → Hispanic/Latino baseline
+      black_pop             → Black/African American baseline
+      aapi (or asian_pop)   → Asian/AAPI baseline  (aapi = asian_pop + nhpi_pop composite)
+      white_nh_pop          → White (Non-Hispanic) baseline
+      youth_vap             → youth cohort (Census ages 18-29) applied to "18-" voter-file rows
+
+    Rows where no non-zero precinct field matches show "N/A†" in the baseline column.
+    Gender rows are excluded — Census block-group VAP data has no gender breakdown.
+    Partisan/turnout rows are in Part A (_voter_file_partisanship_table).
+    """
+    summary = vf_entry.get("summary", {})
+    total   = max(summary.get("total_voters", 0), 1)
+
     precincts_list = (_get_entry(structured_data, "precincts") or {}).get("precincts", [])
-    total_cvap = sum(float(p.get("total_cvap", 0) or 0) for p in precincts_list)
-    total_vap  = sum(float(p.get("total_vap",  0) or 0) for p in precincts_list)
-    hisp_pop   = sum(float(p.get("hispanic_pop", 0) or 0) for p in precincts_list)
-    youth_vap  = sum(float(p.get("youth_vap",   0) or 0) for p in precincts_list)
+    total_vap      = sum(float(p.get("total_vap", 0) or 0) for p in precincts_list)
+
+    def _sum_field(field: str) -> float:
+        return sum(float(p.get(field, 0) or 0) for p in precincts_list)
 
     def _u_pct(count) -> float:
         return count / total * 100
 
-    def _b_pct(numerator, denominator) -> Optional[float]:
+    def _b_pct(numerator: float, denominator: float) -> Optional[float]:
         if denominator > 0 and numerator > 0:
             return numerator / denominator * 100
         return None
 
-    def _fmt_pct(val: float) -> str:
+    def _fmt_p(val: float) -> str:
         return f"{val:.1f}%"
 
     def _fmt_diff(u_pct: float, b_pct: Optional[float]) -> str:
@@ -534,54 +567,67 @@ def _voter_file_comparison_table(vf_entry: dict, structured_data: list) -> tuple
         diff = u_pct - b_pct
         return f"{diff:+.1f} pp"
 
+    # AAPI: composite field (asian_pop + nhpi_pop) stored as "aapi"; fall back to asian_pop alone.
+    _aapi_sum = _sum_field("aapi") or _sum_field("asian_pop")
+
+    # Compute Census baselines from whatever precinct fields are present and non-zero.
+    # Keyed by canonical demographic label for matching against voter-file race breakdown labels.
+    _race_baselines: dict[str, Optional[float]] = {
+        "Hispanic/Latino":        _b_pct(_sum_field("hispanic_pop"), total_vap),
+        "Black/African American": _b_pct(_sum_field("black_pop"),    total_vap),
+        "Asian/AAPI":             _b_pct(_aapi_sum,                  total_vap),
+        "White (Non-Hispanic)":   _b_pct(_sum_field("white_nh_pop"), total_vap),
+    }
+
+    youth_vap = _sum_field("youth_vap")
+
+    def _match_race_baseline(race_label: str) -> Optional[float]:
+        """Map a voter-file race label string to the best available precinct baseline."""
+        r = race_label.lower()
+        if "hispanic" in r or "latino" in r:
+            return _race_baselines.get("Hispanic/Latino")
+        if "black" in r or "african" in r:
+            return _race_baselines.get("Black/African American")
+        if "asian" in r or "aapi" in r or "pacific" in r:
+            return _race_baselines.get("Asian/AAPI")
+        if "white" in r:
+            return _race_baselines.get("White (Non-Hispanic)")
+        return None
+
     headers  = ["Dimension", "Our Universe %", "District Baseline %", "Difference"]
     rows: list[list[str]] = []
     has_na   = False
 
-    for tier, count in sorted(
-        summary.get("partisan_tier_breakdown", {}).items(), key=lambda x: -x[1]
-    ):
-        u = _u_pct(count)
-        rows.append([f"Partisan: {tier}", _fmt_pct(u), "N/A†", "N/A†"])
-        has_na = True
-
-    for tier, count in sorted(
-        summary.get("turnout_tier_breakdown", {}).items(), key=lambda x: -x[1]
-    ):
-        u = _u_pct(count)
-        rows.append([f"Turnout: {tier}", _fmt_pct(u), "N/A†", "N/A†"])
-        has_na = True
-
+    # Age: Census youth_vap (ages 18-29) applied to voter-file cohorts whose label starts "18-"
     for cohort, count in sorted(
         summary.get("age_cohort_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        u = _u_pct(count)
-        b = _b_pct(youth_vap, total_vap) if "18-26" in cohort else None
-        b_str = (f"{b:.1f}% (target precincts)") if b is not None else "N/A†"
-        rows.append([f"Age: {cohort}", _fmt_pct(u), b_str, _fmt_diff(u, b)])
+        u        = _u_pct(count)
+        is_youth = cohort.startswith("18-") or cohort.lower().startswith("youth")
+        b        = _b_pct(youth_vap, total_vap) if (is_youth and total_vap > 0) else None
+        b_str    = f"{b:.1f}% (18-29 Census, target precincts)" if b is not None else "N/A†"
+        rows.append([f"Age: {cohort}", _fmt_p(u), b_str, _fmt_diff(u, b)])
         if b is None:
             has_na = True
 
+    # Race/ethnicity: matched to precinct baselines by label keywords
     for race, count in sorted(
         summary.get("race_breakdown", {}).items(), key=lambda x: -x[1]
     ):
-        u = _u_pct(count)
-        is_hisp = "Hispanic" in race or "Latino" in race
-        b = _b_pct(hisp_pop, total_cvap) if is_hisp else None
-        b_str = (f"{b:.1f}% (target precincts)") if b is not None else "N/A†"
-        rows.append([f"Race: {race}", _fmt_pct(u), b_str, _fmt_diff(u, b)])
+        u     = _u_pct(count)
+        b     = _match_race_baseline(race)
+        b_str = f"{b:.1f}% (target precincts)" if b is not None else "N/A†"
+        rows.append([f"Race: {race}", _fmt_p(u), b_str, _fmt_diff(u, b)])
         if b is None:
             has_na = True
 
-    for gender, count in sorted(
-        summary.get("gender_breakdown", {}).items(), key=lambda x: -x[1]
-    ):
-        u = _u_pct(count)
-        rows.append([f"Gender: {gender}", _fmt_pct(u), "N/A†", "N/A†"])
-        has_na = True
-
     if has_na and rows:
-        rows.append(["† No comparable Census CVAP breakdown available", "", "", ""])
+        rows.append([
+            "† N/A†: Census baseline unavailable — precinct data contains only metrics "
+            "fetched during targeting (e.g. hispanic_pop, black_pop, aapi, youth_vap). "
+            "Gender breakdown is not available from Census block-group data.",
+            "", "", "",
+        ])
 
     return headers, rows
 
@@ -821,15 +867,70 @@ def _build_prompt(
     _finance_entry_bp    = _get_entry(structured_data, "finance")
     has_budget_scenarios = bool((_finance_entry_bp or {}).get("budget_scenarios"))
 
+    # Detect Republican or Democratic incumbent for Political Landscape framing.
+    _er_entry_bp    = _get_entry(structured_data, "election_results")
+    _incumbent_str  = (_er_entry_bp or {}).get("incumbent", "") or ""
+    if "(R)" in _incumbent_str or " R)" in _incumbent_str:
+        landscape_instruction = (
+            "### The Political Landscape\n"
+            f"2–3 sentences: this is a FLIP opportunity — we are challenging a Republican "
+            f"incumbent ({_incumbent_str}). Use Cook PVI or historical margins to characterize "
+            "the difficulty of the flip and explain what factors make it viable now."
+        )
+    elif "(D)" in _incumbent_str or " D)" in _incumbent_str:
+        landscape_instruction = (
+            "### The Political Landscape\n"
+            f"2–3 sentences: this is a HOLD — we are defending a Democratic-held seat. "
+            f"Name the incumbent ({_incumbent_str}). Use Cook PVI or historical margins to "
+            "characterize the competitive threat. Explain what makes this seat worth defending."
+        )
+    else:
+        landscape_instruction = (
+            "### The Political Landscape\n"
+            "2–3 sentences using Cook PVI or historical margins: characterize the seat as a "
+            "safe hold, competitive hold, flip opportunity, or reach. Note the incumbent if "
+            "identified in the election data."
+        )
+
+    # Detect opposition research fallback note (proxy used instead of district-specific entry).
+    _opp_fallback_match = re.search(
+        r'\*Note: No Research Books entry found for[^*]*?Using ([^(]+)\s*\(([^,)]+)',
+        research_context or "",
+    )
+    _opp_fallback_note_for_prompt = None
+    if _opp_fallback_match:
+        _prx_name   = _opp_fallback_match.group(1).strip()
+        _prx_office = _opp_fallback_match.group(2).strip()
+        _opp_fallback_note_for_prompt = (
+            f"*Note: No Research Books entry was found for this specific district. "
+            f"The contrast research below uses {_prx_name} ({_prx_office}) as a proxy. "
+            f"Findings reflect a state-level record — adapt contrast messaging to "
+            f"district-specific context where possible.*"
+        )
+
     # Injected between District Background and Target Universe for electoral plans.
-    contrast_research_section = (
-        "\n## Contrast Research\n"
-        "Cover: the other candidate's name and office if identified in the research findings; "
-        "their key vulnerabilities by issue area (economy, healthcare, public safety, etc.); "
-        "and 2-3 specific contrast messaging angles relevant to the target demographic. "
-        "If the research memo header contains a fallback_note indicating a state-level Republican "
-        "or Trump administration record was used, state this explicitly.\n"
-    ) if (has_contrast_research and is_electoral and is_plan) else ""
+    if has_contrast_research and is_electoral and is_plan:
+        if _opp_fallback_note_for_prompt:
+            contrast_research_section = (
+                "\n## Contrast Research\n"
+                f"{_opp_fallback_note_for_prompt}\n\n"
+                "Cover: the opponent's key vulnerabilities by issue area (economy, healthcare, "
+                "public safety, etc.) drawn from the proxy research findings; 2–3 contrast "
+                "messaging angles relevant to the target demographic. Because this uses a proxy "
+                "record, begin your first sentence by naming it explicitly (e.g. 'Research on "
+                "[name]'s state-level record shows...') and do not present proxy findings as "
+                "district-specific.\n"
+            )
+        else:
+            contrast_research_section = (
+                "\n## Contrast Research\n"
+                "Cover: the other candidate's name and office if identified in the research "
+                "findings; their key vulnerabilities by issue area (economy, healthcare, public "
+                "safety, etc.); and 2–3 specific contrast messaging angles relevant to the "
+                "target demographic.\n"
+            )
+    else:
+        contrast_research_section = ""
 
     # Injected into the Geographic Targeting section.
     if has_coverage_note:
@@ -865,30 +966,24 @@ def _build_prompt(
     voter_file_section = (
         "\n## Voter File Analysis\n"
         "IMPORTANT: Use the exact figures from the VOTER FILE DATA block in this prompt — "
-        "do NOT invent or estimate numbers. A programmatic comparison table is inserted "
-        "above your prose — do NOT reproduce it as a table in your text.\n\n"
-        "Part A — Universe Composition (2–3 paragraphs, first person plural only):\n"
+        "do NOT invent or estimate numbers. Two programmatic tables are already inserted "
+        "above this prose: Part A (Partisanship & Turnout Breakdown) and Part B "
+        "(Universe Composition vs District Baseline). Do NOT reproduce them as tables.\n\n"
+        "Write Part C only — prose interpretation (2–3 paragraphs, first person plural):\n"
         "Working through each dimension in the VOTER FILE DATA block — partisan tier, "
         "turnout propensity, age cohort, race/ethnicity — compare our universe percentages "
         "to the district baseline. For any dimension where our universe differs from the "
         "district by more than 5 percentage points, state the specific percentages and "
-        "name the strategic implication in plain English: e.g. 'Our universe is 61% "
-        "Strong Democrat versus the district's estimated 43% Democratic registrant share — "
-        "our list skews heavily toward existing supporters, strengthening GOTV reach but "
-        "limiting persuasion coverage.' If a dimension is broadly representative, say so "
-        "explicitly rather than forcing a finding. Use 'our universe', 'our list', "
-        "'our program' — never 'the campaign's database' or 'this dataset'.\n\n"
-        "Part B — GOTV vs Persuasion Diagnosis (1 paragraph):\n"
+        "name the strategic implication in plain English. If a dimension is broadly "
+        "representative, say so explicitly rather than forcing a finding. Use 'our universe', "
+        "'our list', 'our program' — never 'the campaign's database' or 'this dataset'.\n\n"
+        "Then in one final paragraph — GOTV vs Persuasion Diagnosis:\n"
         "Using the partisan tier percentages from VOTER FILE DATA — cite "
         "Strong Democrat %, Persuadable Democrat %, True Persuadable %, "
         "Persuadable Republican %, and Strong Republican % by name — state whether our "
         "universe favors a GOTV-heavy, persuasion-heavy, or integrated approach. "
-        "Connect this directly to the win number: if the Strong + Persuadable Democrat "
-        "share of our universe is enough to deliver the win number at expected turnout, "
-        "persuasion spending is supplemental; if it is not, persuasion investment is "
-        "required and the universe needs to be expanded toward True Persuadable voters. "
-        "Explain 'partisan score', 'turnout propensity tier', and 'True Persuadable' "
-        "in plain language on first use."
+        "Connect this directly to the win number. Explain 'partisan score', "
+        "'turnout propensity tier', and 'True Persuadable' in plain language on first use."
     ) if (has_voter_file and is_plan) else ""
 
     # Target Universe addendum based on voter file availability.
@@ -1031,10 +1126,7 @@ primary timing only if it is present in the data — do not invent it.
 Then include this placeholder block exactly as written (on its own line):
 [FILL IN: Add state-specific voting rules — early vote availability, mail ballot rules, registration deadlines, same-day registration, voter ID requirements]
 
-### The Political Landscape
-2–3 sentences using Cook PVI or historical margins: characterize the seat as a safe
-hold, competitive hold, flip opportunity, or reach. Note the incumbent if identified
-in the election data.
+{landscape_instruction}
 
 ## District Background
 Write with specific numbers — do not produce generic boilerplate. Include all of:
@@ -1109,9 +1201,6 @@ Date rules (apply exactly as written):
   [FILL IN: Add the date mail-in ballots are sent to voters in your state]
 - Include this placeholder in Phase 5 (early voting window is set by state law):
   [FILL IN: Add your state's early voting start date]
-
-Then end with (italicised):
-{_ATTRIBUTION}
 """
     elif "win_number" in active_agents:
         structure = f"""
@@ -1158,6 +1247,11 @@ Use H2 for major sections. Use bullet lists and bold for emphasis.
 Then end with: {_ATTRIBUTION}
 """
 
+    _doc_attribution = (
+        f"\nAfter all sections are complete, end the document with this line "
+        f"(italicised, on its own line, outside all section content):\n{_ATTRIBUTION}\n"
+    ) if is_plan else ""
+
     return f"""{error_block}{opening_block}{glossary_block}
 USER REQUEST: {query}
 AGENTS THAT CONTRIBUTED: {', '.join(active_agents) if active_agents else 'none'}
@@ -1168,7 +1262,7 @@ RESEARCH FINDINGS:
 STRUCTURED DATA (win number, precincts, budget):
 {structured_context}
 
-{structure}"""
+{structure}{_doc_attribution}"""
 
 
 def _synthesize(state: AgentState, is_plan: bool, run_id: str | None = None) -> str:
@@ -1523,6 +1617,10 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
         "ExportAgent _write_docx: finance_entry budget_scenarios=%s",
         (finance_entry or {}).get("budget_scenarios"),
     )
+    logger.warning(
+        "ExportAgent _write_docx: budget_scenarios value: %s",
+        (finance_entry or {}).get("budget_scenarios"),
+    )
 
     # Open the branded template if it exists; fall back to a blank document.
     if os.path.exists(TEMPLATE_PATH):
@@ -1555,6 +1653,23 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
         else [k for k in sections if k != "preamble"]
     )
 
+    # Detect opposition research fallback note for shaded annotation in Contrast Research.
+    _opp_fallback_text = None
+    for _memo in state.get("research_results", []):
+        _fm = re.search(
+            r'\*Note: No Research Books entry found for[^*]*?Using ([^(]+)\s*\(([^,)]+)',
+            _memo,
+        )
+        if _fm:
+            _proxy_name   = _fm.group(1).strip()
+            _proxy_office = _fm.group(2).strip()
+            _opp_fallback_text = (
+                f"No Research Books entry was found for this district. "
+                f"Opposition research uses {_proxy_name} ({_proxy_office}) as a proxy — "
+                f"findings reflect state-level record, not a district-specific opponent."
+            )
+            break
+
     for title in ordered_titles:
         # Voter File Analysis: skip entirely when no voter file was uploaded.
         if "Voter File" in title and not vf_entry:
@@ -1572,8 +1687,16 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
             continue
         doc.add_heading(title, level=2)
 
-        # Voter File Analysis: inject comparison table BEFORE prose (Part A then Part B).
+        # Contrast Research: render shaded fallback note when a proxy was used.
+        if "Contrast Research" in title and _opp_fallback_text:
+            _add_fill_in_block(doc, f"Note: {_opp_fallback_text}")
+
+        # Voter File Analysis: inject Part A (partisanship) then Part B (comparison) BEFORE prose.
         if "Voter File" in title and vf_entry:
+            pa_h, pa_r = _voter_file_partisanship_table(vf_entry)
+            if pa_r:
+                doc.add_heading("Partisanship & Turnout Breakdown", level=3)
+                _add_table(doc, pa_h, pa_r)
             vf_h, vf_r = _voter_file_comparison_table(vf_entry, structured_data)
             if vf_r:
                 doc.add_heading("Universe Composition vs District Baseline", level=3)
