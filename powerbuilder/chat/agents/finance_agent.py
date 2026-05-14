@@ -351,52 +351,89 @@ def _build_budget_program(budget: float, unit_costs: dict) -> dict:
     return program
 
 
-def _build_budget_scenarios(budget: float, unit_costs: dict) -> dict:
+def _build_budget_scenarios(
+    budget: Optional[float],
+    unit_costs: dict,
+    full_program_estimate: Optional[dict] = None,
+) -> dict:
     """
-    Compute three planning scenarios at 100%, 75%, and 50% of the full budget.
-    Each entry contains total, description, and cuts (human-readable trade-offs).
+    Compute three planning scenarios at 100%, 75%, and 50% of the base budget.
+
+    Base selection (first non-zero wins):
+      1. budget — user-specified amount from the query
+      2. full_program_estimate['total'] — FEC-derived historical average
+
+    Return value is always a dict with keys 'full', 'mid', 'small' — never None.
+    On any exception, returns a minimal valid dict (totals only, empty cuts strings).
     """
-    full_total  = round(budget, 2)
-    mid_total   = round(budget * 0.75, 2)
-    small_total = round(budget * 0.50, 2)
+    def _minimal(b: float) -> dict:
+        return {
+            "full":  {"total": round(b, 2),        "description": "Full program (100%)",  "cuts": ""},
+            "mid":   {"total": round(b * 0.75, 2), "description": "Mid-range plan (75%)", "cuts": ""},
+            "small": {"total": round(b * 0.50, 2), "description": "Lean plan (50%)",      "cuts": ""},
+        }
 
-    full_prog = _build_budget_program(full_total, unit_costs)
-    mid_prog  = _build_budget_program(mid_total,  unit_costs)
+    base = (budget if (budget and budget > 0) else None) or \
+           ((full_program_estimate or {}).get("total") or 0)
 
-    # Compute reduction counts for the mid scenario cuts description.
-    def _contacts(prog, tactic):
-        return prog.get(tactic, {}).get("contacts", 0)
+    if not base or base <= 0:
+        logger.warning(
+            "_build_budget_scenarios: no valid base (budget=%s, fpe_total=%s) — "
+            "returning minimal scenario dict.",
+            budget, (full_program_estimate or {}).get("total"),
+        )
+        return _minimal(0)
 
-    mail_cut    = _contacts(full_prog, "mail_piece")  - _contacts(mid_prog, "mail_piece")
-    phone_cut   = _contacts(full_prog, "phone_call")  - _contacts(mid_prog, "phone_call")
-    digital_cut = _contacts(full_prog, "digital")     - _contacts(mid_prog, "digital")
+    if not unit_costs:
+        logger.warning("_build_budget_scenarios: unit_costs is empty — falling back to DEFAULT_UNIT_COSTS.")
+        unit_costs = DEFAULT_UNIT_COSTS
 
-    mid_cuts_parts = []
-    if mail_cut > 0:
-        mid_cuts_parts.append(f"mail reduced by ~{mail_cut:,} pieces")
-    if phone_cut > 0:
-        mid_cuts_parts.append(f"phone banking reduced by ~{phone_cut:,} calls")
-    if digital_cut > 0:
-        mid_cuts_parts.append(f"digital reduced by ~{digital_cut:,} impressions")
-    mid_cuts = ("; ".join(mid_cuts_parts) + ". Canvassing maintained.") if mid_cuts_parts else "Proportional reduction across all tactics."
+    try:
+        full_total  = round(base, 2)
+        mid_total   = round(base * 0.75, 2)
+        small_total = round(base * 0.50, 2)
 
-    return {
-        "full": {
-            "total":       full_total,
-            "description": "Full program — all tactics at full allocation",
-            "cuts":        "No reductions. Full canvassing, phone, text, mail, and digital program.",
-        },
-        "mid": {
-            "total":       mid_total,
-            "description": "Mid-range plan at 75% of full budget",
-            "cuts":        mid_cuts,
-        },
-        "small": {
-            "total":       small_total,
-            "description": "Lean plan at 50% of full budget",
-            "cuts":        "Mail eliminated entirely. Digital spend halved. Phone banking significantly reduced. Canvassing prioritized as primary contact method.",
-        },
-    }
+        full_prog = _build_budget_program(full_total, unit_costs)
+        mid_prog  = _build_budget_program(mid_total,  unit_costs)
+
+        def _contacts(prog, tactic):
+            return prog.get(tactic, {}).get("contacts", 0)
+
+        mail_cut    = _contacts(full_prog, "mail_piece")  - _contacts(mid_prog, "mail_piece")
+        phone_cut   = _contacts(full_prog, "phone_call")  - _contacts(mid_prog, "phone_call")
+        digital_cut = _contacts(full_prog, "digital")     - _contacts(mid_prog, "digital")
+
+        mid_cuts_parts = []
+        if mail_cut > 0:
+            mid_cuts_parts.append(f"mail reduced by ~{mail_cut:,} pieces")
+        if phone_cut > 0:
+            mid_cuts_parts.append(f"phone banking reduced by ~{phone_cut:,} calls")
+        if digital_cut > 0:
+            mid_cuts_parts.append(f"digital reduced by ~{digital_cut:,} impressions")
+        mid_cuts = (
+            "; ".join(mid_cuts_parts) + ". Canvassing maintained."
+        ) if mid_cuts_parts else "Proportional reduction across all tactics."
+
+        return {
+            "full": {
+                "total":       full_total,
+                "description": "Full program — all tactics at full allocation",
+                "cuts":        "No reductions. Full canvassing, phone, text, mail, and digital program.",
+            },
+            "mid": {
+                "total":       mid_total,
+                "description": "Mid-range plan at 75% of full budget",
+                "cuts":        mid_cuts,
+            },
+            "small": {
+                "total":       small_total,
+                "description": "Lean plan at 50% of full budget",
+                "cuts":        "Mail eliminated entirely. Digital spend halved. Phone banking significantly reduced. Canvassing prioritized as primary contact method.",
+            },
+        }
+    except Exception as e:
+        logger.warning("_build_budget_scenarios failed: %s — returning minimal scenario dict.", e)
+        return _minimal(base)
 
 
 def _build_voter_file_budget(universe_size: int, unit_costs: dict) -> dict:
@@ -918,10 +955,15 @@ BUDGET: [number or NONE]
     # 5. Build budget-constrained program if a budget was provided
     # -----------------------------------------------------------------------
     budget_program: Optional[dict] = None
-    budget_scenarios: Optional[dict] = None
     if budget_available is not None:
-        budget_program   = _build_budget_program(budget_available, unit_costs)
-        budget_scenarios = _build_budget_scenarios(budget_available, unit_costs)
+        budget_program = _build_budget_program(budget_available, unit_costs)
+
+    _fpe = (
+        {"total": round(fec_result["avg_disbursements"], 2), **(category_breakdown or {})}
+        if fec_result and fec_result.get("avg_disbursements")
+        else None
+    )
+    budget_scenarios = _build_budget_scenarios(budget_available, unit_costs, _fpe)
 
     # -----------------------------------------------------------------------
     # 6. Build human-readable district label

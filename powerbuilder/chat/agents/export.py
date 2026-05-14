@@ -252,28 +252,6 @@ def _dedup(items: list) -> list:
     return unique
 
 
-def _most_recent_date(research_results: list) -> str:
-    """
-    Scan memo headers written by researcher.py for DATE fields and return
-    the most recent date string found. Returns "unknown" if none parse.
-    """
-    dated = []
-    for memo in research_results:
-        for match in re.finditer(r"\| DATE: ([^|\-\n]+?) ---", memo):
-            raw = match.group(1).strip()
-            for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y",
-                        "%B %Y", "%b %Y", "%B %d, %Y", "%Y"):
-                try:
-                    dated.append((datetime.strptime(raw, fmt), raw))
-                    break
-                except ValueError:
-                    continue
-    if dated:
-        dated.sort(key=lambda x: x[0], reverse=True)
-        return dated[0][1]
-    return "unknown"
-
-
 def _get_entry(structured_data: list, agent: str) -> Optional[dict]:
     """Return the first structured_data entry from the named agent, or None."""
     return next((d for d in structured_data if d.get("agent") == agent), None)
@@ -1422,8 +1400,6 @@ def _add_table(doc, headers: list, rows: list):
     """Add a styled data table to a docx Document."""
     if not rows:
         return
-    from docx.shared import Pt, RGBColor
-
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     try:
         table.style = "Light Grid Accent 1"
@@ -1613,14 +1589,6 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     finance_entry   = _get_entry(structured_data, "finance")
     vf_entry        = _get_entry(structured_data, "voter_file")
     precincts       = (precinct_entry or {}).get("precincts", [])
-    logger.info(
-        "ExportAgent _write_docx: finance_entry budget_scenarios=%s",
-        (finance_entry or {}).get("budget_scenarios"),
-    )
-    logger.warning(
-        "ExportAgent _write_docx: budget_scenarios value: %s",
-        (finance_entry or {}).get("budget_scenarios"),
-    )
 
     # Open the branded template if it exists; fall back to a blank document.
     if os.path.exists(TEMPLATE_PATH):
@@ -1643,8 +1611,6 @@ def _write_docx(synthesis: str, state: AgentState, district_label: str) -> dict:
     synthesis_for_docx = _strip_inline_paid_media(synthesis) if paid_media_plan else synthesis
 
     sections = _parse_sections(synthesis_for_docx)
-    logger.info("ExportAgent _write_docx: PLAN_SECTION_ORDER=%s", PLAN_SECTION_ORDER)
-    logger.info("ExportAgent _write_docx: LLM sections generated=%s", list(sections.keys()))
 
     # Use PLAN_SECTION_ORDER when this is a plan doc; otherwise use whatever the LLM produced.
     ordered_titles = (
@@ -1869,7 +1835,7 @@ def _write_xlsx(synthesis: str, state: AgentState, district_label: str) -> dict:
     return {"final_answer": brief, "generated_file_path": path}
 
 
-def _write_csv(synthesis: str, state: AgentState, district_label: str) -> dict:
+def _write_csv(_: str, state: AgentState, district_label: str) -> dict:
     """
     Flat CSV of target precincts. Falls back to a structured_data summary
     (agent, key, value rows) if no precinct data is available.
