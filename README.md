@@ -4,7 +4,7 @@
 
 Powerbuilder is a Django + LangGraph application that coordinates a team of specialist AI agents (researcher, win-number, precincts, messaging, opposition research, voter-file analyst, and more) to generate full civic engagement plans, segment-targeted messaging, and budget estimates from a single natural-language request.
 
-Built by [Benjamin Oh](https://github.com/benoh20) and [Rosario Palacios](https://github.com/Mdr-palacios) as equal partners through the **DxP Fellowship**.
+Built by [Benjamin Oh](https://github.com/benoh20) and [Rosario Palacios](https://github.com/Mdr-palacios) as partners through the **DxP Fellowship**.
 
 **Environments.** The production deployment lives at [powerbuilder.app](https://powerbuilder.app). A preview environment tracking `main` runs at [powerbuilder-preview.onrender.com](https://powerbuilder-preview.onrender.com) on Render's free tier, so cold-start can take up to 60 seconds on the first hit.
 
