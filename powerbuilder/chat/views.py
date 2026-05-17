@@ -54,10 +54,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Set DEMO_PASSWORD=<value> in .env
-DEMO_PASSWORD    = os.environ.get("DEMO_PASSWORD", "")
-UPLOAD_DIR       = "data/uploads"
-EXPORTS_DIR      = "exports"
-MAX_CONVERSATIONS = 20
+DEMO_PASSWORD       = os.environ.get("DEMO_PASSWORD", "")
+UPLOAD_DIR          = "data/uploads"
+EXPORTS_DIR         = "exports"
+RESEARCH_MEMOS_DIR  = "research_memos"
+MAX_CONVERSATIONS   = 20
 
 _ALLOWED_DOWNLOAD_EXTS = {".docx", ".csv", ".xlsx"}
 
@@ -750,6 +751,34 @@ def download_view(request, filename: str):
     response = HttpResponse(content, content_type=content_types[ext])
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+# ---------------------------------------------------------------------------
+# Research memo PDF download
+# ---------------------------------------------------------------------------
+
+@demo_login_required
+def research_download_view(_, filename: str):
+    """
+    Serves a PDF from research_memos/ as a downloadable attachment.
+    Only .pdf files are served; path traversal is rejected.
+    """
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise Http404
+
+    if not filename.lower().endswith(".pdf"):
+        raise Http404
+
+    filepath = os.path.join(RESEARCH_MEMOS_DIR, filename)
+    if not os.path.isfile(filepath):
+        raise Http404
+
+    with open(filepath, "rb") as fh:
+        content = fh.read()
+
+    response = HttpResponse(content, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
 
 # ---------------------------------------------------------------------------
 # Conversation management API (Milestone F)

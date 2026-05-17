@@ -99,12 +99,27 @@ def extract_sources(research_results: Iterable[str] | None) -> list[dict]:
             date_range = f"{sorted_dates[0]} → {sorted_dates[-1]}"
         else:
             date_range = ""
+        # If the source string is a bare PDF filename (no path separators,
+        # ends in .pdf), attach a download URL pointing at the research endpoint.
+        src = entry["source"]
+        if (src.lower().endswith(".pdf")
+                and "/" not in src
+                and "\\" not in src
+                and ".." not in src):
+            pdf_filename = src
+            download_url: str | None = f"/research/{src}/"
+        else:
+            pdf_filename = None
+            download_url = None
+
         cards.append({
-            "source":     entry["source"],
-            "date":       primary,
-            "date_range": date_range,
-            "count":      len(dates),
-            "preview":    entry["preview"],
+            "source":       src,
+            "date":         primary,
+            "date_range":   date_range,
+            "count":        len(dates),
+            "preview":      entry["preview"],
+            "pdf_filename": pdf_filename,
+            "download_url": download_url,
         })
     return cards
 

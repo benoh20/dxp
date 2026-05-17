@@ -187,17 +187,15 @@ SYSTEM_PROMPT_ORGANIZING = (
     "You are a senior organizer in the popular-education tradition (re:power, "
     "Wellstone, Ruckus Society, FWD.us Community Accelerator). You have received "
     "findings from specialist analysts. Synthesize them into a single clear "
-    "non-repetitive professional briefing written in first person plural "
-    "('we', 'our campaign'). "
+    "non-repetitive professional program briefing written in first person plural "
+    "(we, our organization). "
     "Methodology comes before tactics. Open every briefing with an explicit "
-    "Theory of Change in the form 'If we do X, then Y will happen' before "
+    "Theory of Change in the form If we do X, then Y will happen before "
     "naming any tactic, channel, or content. "
-    "Use canonical organizing vocabulary (base, persuadable, target, ladder "
-    "of engagement, rung, escalation, mobilize vs. organize), not generic "
-    "marketing language (followers, audience reach, engagement funnel, conversion). "
+    "Use canonical organizing vocabulary: base, persuadable, target, ladder "
+    "of engagement, rung, spectrum of allies, escalation, mobilize vs. organize. "
     "Do not invent information not present in the inputs. "
-    "Defer to the most specific and most recently dated source when findings "
-    "conflict. Do not mention AI, agents, or automated tools."
+    "Do not mention AI, agents, or automated tools."
 )
 
 SYSTEM_PROMPT_ELECTORAL = (
@@ -279,8 +277,8 @@ def _district_label(structured_data: list) -> str:
         sf  = entry.get("state_fips", "")
         abbr = _FIPS_TO_STATE_ABBR.get(sf, "")
 
-        if did == "statewide":
-            return f"Statewide {dt}"
+        if did in ("statewide", "statewide_bg_to_precinct"):
+            return f"{abbr} Statewide" if abbr else "Statewide"
 
         # All-digit GEOID: {state_fips_2}{district_num} — e.g. '0406', '51007'
         if re.match(r"^\d{4,5}$", did):
@@ -354,18 +352,37 @@ def _win_table(win_entry: dict) -> tuple:
 
 
 _PRECINCT_HEADER_LABELS: dict[str, str] = {
-    "youth_vap":              "Youth VAP",
-    "college_enrolled":       "College Enrolled",
+    # Individual demographic columns
+    "black_pop":          "Black Pop",
+    "hispanic_pop":       "Hispanic Pop",
+    "aapi":               "AAPI Pop",
+    "asian_pop":          "Asian Pop",
+    "native_pop":         "Native Pop",
+    "nhpi_pop":           "NHPI Pop",
+    "white_nh_pop":       "White (Non-Hisp.)",
+    "foreign_born_pop":   "Foreign Born",
+    "veteran_pop":        "Veteran Pop",
+    "owner_pop":          "Homeowners",
+    "renter_pop":         "Renters",
+    "poverty_pop":        "Below Poverty",
+    "senior_vap":         "Senior VAP (65+)",
+    "youth_vap":          "Youth VAP (18-29)",
+    "college_enrolled":   "College Enrolled",
+    # Summary columns (always last)
     "total_vap":              "Total VAP",
-    "target_demographic_vap": "Target Demographic VAP",
-    "target_demographic_pct": "Target Demographic Pct",
+    "target_demographic_vap": "Target Demo VAP",
+    "target_demographic_pct": "Target Demo %",
 }
 
 
 def _precinct_table(precincts: list) -> tuple:
     """Build (headers, rows) from a list of precinct dicts.
 
+    Column order: individual demographic columns first, then total_vap, then
+    the two target summary columns (target_demographic_vap, target_demographic_pct).
     Penetration Rate is excluded — it duplicates Target Demographic Pct.
+    For combined queries (black+youth etc.) both individual columns appear before
+    the max-based target_demographic_vap so the breakdown is visible.
     """
     if not precincts:
         return [], []
@@ -373,7 +390,13 @@ def _precinct_table(precincts: list) -> tuple:
         "precinct_geoid", "precinct_id", "approximate_boundary",
         "precinct_name", "penetration_rate",
     }
-    metric_keys = [k for k in precincts[0] if k not in exclude]
+    _summary_cols = {"total_vap", "target_demographic_vap", "target_demographic_pct"}
+    all_keys = [k for k in precincts[0] if k not in exclude]
+    individual_cols = [k for k in all_keys if k not in _summary_cols]
+    summary_cols    = [k for k in ("total_vap", "target_demographic_vap", "target_demographic_pct")
+                       if k in all_keys]
+    metric_keys = individual_cols + summary_cols
+
     headers = [
         "Precinct",
         *[_PRECINCT_HEADER_LABELS.get(k, k.replace("_", " ").title()) for k in metric_keys],
@@ -384,7 +407,7 @@ def _precinct_table(precincts: list) -> tuple:
         for k in metric_keys:
             val = p.get(k)
             if isinstance(val, (int, float)):
-                if k == "target_demographic_pct":
+                if k.endswith("_pct"):
                     formatted = f"{float(val):.2f}%"
                 else:
                     formatted = f"{float(val):,.0f}"
@@ -1180,6 +1203,70 @@ Date rules (apply exactly as written):
 - Include this placeholder in Phase 5 (early voting window is set by state law):
   [FILL IN: Add your state's early voting start date]
 """
+        if not is_electoral:
+            _pt = POWER_TYPES.get(power_type, POWER_TYPES["through"])
+            structure = f"""
+Produce a complete Organizing Program Plan in Markdown for:
+"{query}"
+Use H1 for the document title, H2 for each section. Do NOT use markdown tables —
+structured data tables will be inserted programmatically. Use bullet lists and bold.
+
+This is a {_pt['label']} program: {_pt['definition']}.
+
+Required H2 sections (use these exact titles):
+
+## Executive Summary
+2–3 paragraphs. The first paragraph must open with the Theory of Change in the
+form 'If we do X, then Y will happen' before naming any tactic or channel.
+Name the power type ({_pt['label']}), the base we are building from,
+the target (decision-maker or institution with power to grant our demands),
+and the core strategic logic.
+
+## Theory of Change
+Restate and expand the theory: 'If we [specific action], then [specific outcome].'
+Unpack the causal logic in 3–5 sentences grounded in this specific context.
+Name what assumptions the theory depends on and how we will test them.
+
+## Community Analysis
+Three sub-sections:
+- **Base**: who is already aligned and must be activated? Name specific communities,
+  organizations, or constituencies drawn from the research findings.
+- **Persuadables**: who is not yet committed but could be moved with the right framing?
+  Name the spectrum of allies — active supporters, passive supporters, neutrals.
+- **Target**: the specific decision-maker with power to grant our demands. Name them,
+  their institution, and what leverage points exist.
+
+## Methodology
+The organizing approach in causal order — methodology before tactics.
+Explain what base-building, relational organizing, and mobilization methods
+we use and why in this specific context. Tie each method to the Theory of Change.
+
+## Ladder of Engagement
+Present the full ladder from lowest to highest commitment. For each rung name:
+- The specific ask (what we are asking people to do)
+- Who it is aimed at (base, persuadable, or general public)
+- What success looks like at that rung and how it advances the Theory of Change
+At least 5 rungs. The highest rung should be a mobilization or escalation action.
+
+## Geographic Targeting
+{precinct_instruction}
+
+## Messaging Strategy
+{messaging_strategy_body}
+
+## Budget Estimate
+Narrative interpretation of the budget in organizing terms — what organizer capacity,
+materials, and mobilization it funds. Do not reproduce tables — they will be
+inserted after this section.{budget_vf_note}{budget_scenario_note}
+
+## Program Recommendations
+{recommendations_note}
+
+## What This Won't Do
+3 bullets naming the limits of this plan — what human judgment must supply,
+what data gaps remain, and what this briefing cannot substitute for on the ground.
+Ground each bullet in what is specifically absent from the inputs above, not generic disclaimers.
+"""
     elif "win_number" in active_agents:
         structure = f"""
 Produce a focused win number briefing for {district_label} in Markdown.
@@ -1218,10 +1305,16 @@ Then end with (italicised):
             "The first paragraph must state the Theory of Change in the form "
             "'If we do X, then Y will happen' before any tactics.\n"
         )
+        wont_do_section = (
+            "\n## What This Won't Do\n"
+            "End with 3 bullets naming this briefing's limits — what human judgment "
+            "must supply, what data gaps exist, and what this briefing cannot "
+            "substitute for on the ground.\n"
+        ) if not is_electoral else ""
         structure = f"""
 Produce a professional briefing in Markdown responding to: "{query}"
 Use H2 for major sections. Use bullet lists and bold for emphasis.
-{toc_line}
+{toc_line}{wont_do_section}
 Then end with: {_ATTRIBUTION}
 """
 

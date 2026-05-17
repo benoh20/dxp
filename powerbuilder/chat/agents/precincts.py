@@ -906,6 +906,16 @@ class PrecinctsAgent:
                 if wcol in row.index:
                     record[metric] = round(float(row[wcol]), 2)
 
+            # For combined targeting, guarantee each primary metric has an entry.
+            # The loop above covers them when weighted columns exist; this fallback
+            # ensures both individual columns always appear in the record (as 0.0
+            # rather than missing) so the table can always render them as columns.
+            if use_combined_target and combined_primary_metrics:
+                for pm in combined_primary_metrics:
+                    if pm not in record:
+                        wcol = f"weighted_{pm}"
+                        record[pm] = round(float(row.get(wcol, 0) or 0), 2)
+
             # Always-present targeting columns
             total_vap_val = float(row.get("weighted_total_vap", 0) or 0)
             if use_combined_target:
@@ -1114,6 +1124,7 @@ TOP_N: [integer number of precincts to return, default 20]
             )
 
         if len(intents) > 1:
+            state_update["structured_data"][0]["combined_primary_metrics"] = combined_primary_metrics
             state_update["structured_data"][0]["combined_demographics_note"] = (
                 f"Multi-demographic targeting: combined {' + '.join(intents)} groups. "
                 f"Precincts ranked by the larger of: {', '.join(combined_primary_metrics or [])}. "

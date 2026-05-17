@@ -26,7 +26,8 @@ urlpatterns = [
     path("stream/", views.stream_query_view,  name="stream_query"),
 
     # File download
-    path("download/<str:filename>/", views.download_view, name="download"),
+    path("download/<str:filename>/",  views.download_view,          name="download"),
+    path("research/<str:filename>/",  views.research_download_view, name="research_download"),
 
     # Conversation management API (Milestone F).
     # All POST-only, JSON-bodied, return JSON. CSRF token required.
