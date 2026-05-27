@@ -700,6 +700,8 @@ def _format_structured_for_prompt(structured_data: list) -> str:
             lines.append(f"  Cook PVI: {er['cook_pvi']}")
         if er.get("race_rating"):
             lines.append(f"  Race rating: {er['race_rating']}")
+        if er.get("rating_date"):
+            lines.append(f"  Rating date: {er['rating_date']}")
         if er.get("incumbent"):
             lines.append(f"  Incumbent: {er['incumbent']}")
         if er.get("trend"):

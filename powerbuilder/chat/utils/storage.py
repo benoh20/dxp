@@ -16,10 +16,11 @@ S3 path mapping rules (evaluated in order, relative paths only)
   data/election_results/* → election_results/*    (per-state master CSVs)
   data/crosswalks/*       → crosswalks/*           (BG-to-precinct crosswalk files)
   chat/precinct_shapefiles/* → shapefiles/*        (TopoJSON and other spatial files)
+  data/cook_ratings.json  → cook_ratings.json      (Cook Political static ratings)
 
 Any path that does NOT match one of the rules above is always handled by the
 local filesystem, even when STORAGE_BACKEND='s3'. This covers temporary caches
-(data/medsl_cache/, data/cook_cache/) and any other local-only artifacts.
+(data/medsl_cache/) and any other local-only artifacts.
 
 S3 credentials (required when STORAGE_BACKEND='s3')
 ----------------------------------------------------
@@ -78,6 +79,7 @@ def _to_s3_key(path: str) -> Optional[str]:
       data/election_results/* → election_results/*
       data/crosswalks/*       → crosswalks/*
       chat/precinct_shapefiles/* → shapefiles/*
+      data/cook_ratings.json  → cook_ratings.json
     """
     p = path.replace("\\", "/")
     if p.startswith("data/election_results/"):
@@ -86,6 +88,8 @@ def _to_s3_key(path: str) -> Optional[str]:
         return "crosswalks/" + p[len("data/crosswalks/"):]
     if p.startswith("chat/precinct_shapefiles/"):
         return "shapefiles/" + p[len("chat/precinct_shapefiles/"):]
+    if p == "data/cook_ratings.json":
+        return "cook_ratings.json"
     return None
 
 

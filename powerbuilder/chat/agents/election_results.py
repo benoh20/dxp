@@ -603,7 +603,7 @@ def election_results_node(state: AgentState) -> dict:
             dist_num = int(district_id[len(state_fips):].lstrip("0") or "1")
         except (ValueError, IndexError):
             dist_num = 1
-        cook = cook_client.get_district_rating(state_abbr, dist_num)
+        cook = cook_client.get_district_rating(state_fips, dist_num)
     else:
         # State legislative races are not covered by Cook
         from ..utils.cook_client import _null_result
@@ -656,6 +656,8 @@ def election_results_node(state: AgentState) -> dict:
         "cook_pvi":         cook.get("cook_pvi"),
         "race_rating":      cook.get("race_rating"),
         "incumbent":        cook.get("incumbent"),
+        "rating_date":      cook.get("rating_date"),
+        "is_flip":          cook.get("is_flip", False),
         "cook_source":      cook.get("source"),
     }
 
