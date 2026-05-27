@@ -719,6 +719,11 @@ def _format_structured_for_prompt(structured_data: list) -> str:
                     f"  Vote share: D {mr['dem_pct'] * 100:.1f}% / "
                     f"R {mr['rep_pct'] * 100:.1f}% ({party}+{abs(m) * 100:.1f}%)"
                 )
+            elif er.get("party_data_available") is False:
+                lines.append(
+                    "  D/R vote share: not available "
+                    "(run sync_national_database() to refresh master CSV)"
+                )
         cb = er.get("climate_breakdown") or {}
         for climate_type, data in cb.items():
             if data and data.get("n", 0) > 0:

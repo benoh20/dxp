@@ -114,6 +114,100 @@ class ElectionDataUtility:
             return pd.DataFrame()
 
     @staticmethod
+    def _party_shares(
+        raw_df: pd.DataFrame,
+        fips_int: int,
+        fips_str: str,
+        office_type: str,
+    ) -> pd.DataFrame:
+        """
+        Compute D/R vote shares per year+district from a candidate-level raw DataFrame.
+
+        Parameters
+        ----------
+        raw_df      : candidate-level MEDSL DataFrame (GEN/TOTAL filtered, all states)
+        fips_int    : integer state FIPS (used to slice raw_df)
+        fips_str    : zero-padded 2-char FIPS string (used for district GEOID formatting)
+        office_type : 'house' or 'senate'
+
+        Returns a DataFrame with columns:
+            [year, district, dem_votes, rep_votes, dem_pct, rep_pct]
+        where ``district`` is the GEOID-format string matching the master CSV.
+        Returns an empty DataFrame when the data is absent or insufficient.
+        """
+        if raw_df is None or raw_df.empty:
+            return pd.DataFrame()
+
+        required = {"party", "candidatevotes", "totalvotes", "year", "district", "state_fips"}
+        if not required.issubset(raw_df.columns):
+            return pd.DataFrame()
+
+        df = raw_df[raw_df["state_fips"] == int(fips_int)].copy()
+        if df.empty:
+            return pd.DataFrame()
+
+        # Filter to the two major parties only
+        party_upper = df["party"].fillna("").str.upper().str.strip()
+        is_dem = party_upper.str.contains("DEMOCRAT", na=False)
+        is_rep = party_upper.str.contains("REPUBLICAN", na=False)
+        party_df = df[is_dem | is_rep].copy()
+        if party_df.empty:
+            return pd.DataFrame()
+
+        # Standardize district to GEOID format (mirrors the main pipeline)
+        party_df["district"] = party_df["district"].apply(
+            lambda d: ElectionDataUtility._standardize_district(d, fips_str, office_type)
+        )
+
+        # Tag each candidate row as dem or rep
+        _pu = party_df["party"].fillna("").str.upper().str.strip()
+        party_df["party_tag"] = _pu.str.contains("DEMOCRAT").map({True: "dem", False: "rep"})
+
+        # Sum candidatevotes by year + district + party_tag
+        agg = (
+            party_df
+            .groupby(["year", "district", "party_tag"], as_index=False)["candidatevotes"]
+            .sum()
+        )
+
+        # Pivot to dem_votes / rep_votes columns
+        pivot = agg.pivot_table(
+            index=["year", "district"],
+            columns="party_tag",
+            values="candidatevotes",
+            fill_value=0,
+        ).reset_index()
+        pivot.columns.name = None
+
+        for col in ("dem", "rep"):
+            if col not in pivot.columns:
+                pivot[col] = 0
+        pivot = pivot.rename(columns={"dem": "dem_votes", "rep": "rep_votes"})
+
+        # Get totalvotes per year+district from the first candidate row
+        # (totalvotes is constant across all candidates in a race)
+        totals = df.copy()
+        totals["district"] = totals["district"].apply(
+            lambda d: ElectionDataUtility._standardize_district(d, fips_str, office_type)
+        )
+        totals = totals.groupby(["year", "district"], as_index=False)["totalvotes"].first()
+
+        pivot = pivot.merge(totals, on=["year", "district"], how="left")
+
+        pivot["dem_pct"] = (
+            (pivot["dem_votes"] / pivot["totalvotes"])
+            .where(pivot["totalvotes"] > 0)
+            .round(4)
+        )
+        pivot["rep_pct"] = (
+            (pivot["rep_votes"] / pivot["totalvotes"])
+            .where(pivot["totalvotes"] > 0)
+            .round(4)
+        )
+
+        return pivot[["year", "district", "dem_votes", "rep_votes", "dem_pct", "rep_pct"]]
+
+    @staticmethod
     def sync_national_database(years=range(2014, 2026, 2), state_fips=None) -> bool:
         """
         Synchronizes historical election data and writes per-state master CSVs.
@@ -264,6 +358,22 @@ class ElectionDataUtility:
                     )
 
                 master_df = pd.concat([state_house, state_senate], ignore_index=True)
+
+                # Second pass: merge D/R vote shares from candidate-level source data.
+                # house_df and senate_df (outer scope) retain one row per candidate;
+                # _party_shares groups by year+district to produce dem_votes, rep_votes,
+                # dem_pct, rep_pct. Left-join so races with no major-party candidates
+                # (e.g. uncontested seats) keep NaN rather than being dropped.
+                house_party  = ElectionDataUtility._party_shares(house_df,  fips, fips_str, "house")
+                senate_party = ElectionDataUtility._party_shares(senate_df, fips, fips_str, "senate")
+                party_shares = pd.concat([house_party, senate_party], ignore_index=True)
+                if not party_shares.empty:
+                    master_df = master_df.merge(
+                        party_shares[["year", "district", "dem_votes", "rep_votes", "dem_pct", "rep_pct"]],
+                        on=["year", "district"],
+                        how="left",
+                    )
+
                 write_dataframe(state_path, master_df)
                 print(f"  Synced {fips_str} ({len(master_df)} races)")
 

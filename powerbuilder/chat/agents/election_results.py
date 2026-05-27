@@ -520,17 +520,41 @@ def election_results_node(state: AgentState) -> dict:
         )
 
     # ------------------------------------------------------------------
-    # 3. Load party-level margin data from raw MEDSL
+    # 3. Load party-level margin data
+    #
+    # Preferred path  — master CSV columns dem_pct / rep_pct written by the
+    #   ingestor second pass (no extra download required).
+    # Fallback path   — raw MEDSL download via _extract_party_margins()
+    #   (used for master CSVs built before the second-pass feature, or for
+    #   districts where the master CSV lacks party columns).
     # ------------------------------------------------------------------
     margin_df = None
     if district_type in ("congressional", "senate"):
-        margin_df = _extract_party_margins(district_type, state_fips, district_id)
-        if margin_df is None:
-            errors_out.append(
-                "ElectionAnalyst: MEDSL party-level data unavailable — "
-                "margin trend and D/R vote shares cannot be computed. "
-                "Turnout data from master CSV will still be used."
+        if (
+            master_df is not None
+            and not master_df.empty
+            and "dem_pct" in master_df.columns
+            and master_df["dem_pct"].notna().any()
+        ):
+            _party = (
+                master_df[["year", "totalvotes", "dem_pct", "rep_pct"]]
+                .dropna(subset=["dem_pct", "rep_pct"])
+                .copy()
             )
+            _party["margin"] = (_party["dem_pct"] - _party["rep_pct"]).round(4)
+            margin_df = _party.reset_index(drop=True)
+            logger.debug(
+                "ElectionAnalyst: using master CSV party columns for district %s", district_id
+            )
+
+        if margin_df is None:
+            margin_df = _extract_party_margins(district_type, state_fips, district_id)
+            if margin_df is None:
+                errors_out.append(
+                    "ElectionAnalyst: MEDSL party-level data unavailable — "
+                    "margin trend and D/R vote shares cannot be computed. "
+                    "Turnout data from master CSV will still be used."
+                )
 
     # ------------------------------------------------------------------
     # 4. Compute analytics
@@ -653,6 +677,9 @@ def election_results_node(state: AgentState) -> dict:
         "avg_margin":       round(avg_margin, 4) if avg_margin is not None else None,
         "most_recent":      most_recent,
         "climate_breakdown": climate_breakdown,
+        "party_data_available": (
+            most_recent is not None and most_recent.get("dem_pct") is not None
+        ),
         "cook_pvi":         cook.get("cook_pvi"),
         "race_rating":      cook.get("race_rating"),
         "incumbent":        cook.get("incumbent"),
