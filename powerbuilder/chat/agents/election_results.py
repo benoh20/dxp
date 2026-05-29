@@ -536,16 +536,21 @@ def election_results_node(state: AgentState) -> dict:
             and "dem_pct" in master_df.columns
             and master_df["dem_pct"].notna().any()
         ):
-            _party = (
-                master_df[["year", "totalvotes", "dem_pct", "rep_pct"]]
-                .dropna(subset=["dem_pct", "rep_pct"])
-                .copy()
-            )
-            _party["margin"] = (_party["dem_pct"] - _party["rep_pct"]).round(4)
-            margin_df = _party.reset_index(drop=True)
-            logger.debug(
-                "ElectionAnalyst: using master CSV party columns for district %s", district_id
-            )
+            # Coerce all numeric columns explicitly — CSV reads can produce object
+            # dtype (string "nan", mixed int/float), which breaks dropna and
+            # causes float(nan) to silently survive None checks downstream.
+            _party = master_df[["year", "totalvotes", "dem_pct", "rep_pct"]].copy()
+            for _col in ("year", "totalvotes", "dem_pct", "rep_pct"):
+                _party[_col] = pd.to_numeric(_party[_col], errors="coerce")
+            _party = _party.dropna(subset=["year", "dem_pct", "rep_pct"])
+            if not _party.empty:
+                _party["margin"] = (_party["dem_pct"] - _party["rep_pct"]).round(4)
+                margin_df = _party.reset_index(drop=True)
+                logger.debug(
+                    "ElectionAnalyst: using master CSV party columns for district %s"
+                    " (%d cycles with party data)",
+                    district_id, len(margin_df),
+                )
 
         if margin_df is None:
             margin_df = _extract_party_margins(district_type, state_fips, district_id)
@@ -566,15 +571,29 @@ def election_results_node(state: AgentState) -> dict:
     avg_margin   = None
 
     if margin_df is not None and not margin_df.empty:
-        # Most recent cycle with party data
-        latest    = margin_df.sort_values("year").iloc[-1]
+        # Most recent cycle with party data — use idxmax() so the row selection is
+        # correct even if year is object dtype, and guard every float() with pd.isna()
+        # so NaN values become None rather than leaking as float("nan").
+        latest = margin_df.loc[margin_df["year"].idxmax()]
+
+        _dem = latest["dem_pct"]
+        _rep = latest["rep_pct"]
+        _mar = latest["margin"]
+
         most_recent = {
             "year":       int(latest["year"]),
-            "dem_pct":    round(float(latest["dem_pct"]), 4),
-            "rep_pct":    round(float(latest["rep_pct"]), 4),
-            "margin":     round(float(latest["margin"]), 4),
+            "dem_pct":    round(float(_dem), 4) if not pd.isna(_dem) else None,
+            "rep_pct":    round(float(_rep), 4) if not pd.isna(_rep) else None,
+            "margin":     round(float(_mar), 4) if not pd.isna(_mar) else None,
             "totalvotes": int(latest["totalvotes"]),
         }
+
+        logger.info(
+            "ElectionAnalyst: most recent cycle selected — district=%s year=%s "
+            "dem_pct=%s rep_pct=%s",
+            district_id, most_recent["year"],
+            most_recent["dem_pct"], most_recent["rep_pct"],
+        )
 
         # Margin trend narrative
         trend_note = _margin_trend(margin_df)
