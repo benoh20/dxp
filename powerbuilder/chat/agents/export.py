@@ -751,6 +751,49 @@ def _format_structured_for_prompt(structured_data: list) -> str:
                         f"  {climate_type.title()} avg ({data['n']} cycles{cycles_str}): "
                         f"{party}+{abs(avg_m) * 100:.1f}%"
                     )
+
+        # Full cycle-by-cycle history for LLM trend narrative.
+        # The LLM MUST cite specific years and margins — this block provides the raw data.
+        ch = er.get("cycle_history") or []
+        if ch:
+            lines.append("  ELECTION HISTORY (all available cycles):")
+            for cyc in ch:
+                yr = cyc.get("year", "?")
+                tv = cyc.get("totalvotes")
+                dp = cyc.get("dem_pct")
+                rp = cyc.get("rep_pct")
+                mg = cyc.get("margin")
+                tv_str = f"total_votes={tv:,}" if tv is not None else "total_votes=N/A"
+                dp_str = f"dem_pct={dp * 100:.1f}%" if dp is not None else "dem_pct=N/A"
+                rp_str = f"rep_pct={rp * 100:.1f}%" if rp is not None else "rep_pct=N/A"
+                if mg is not None:
+                    mg_party = "D" if mg >= 0 else "R"
+                    mg_str   = f"margin={mg_party}+{abs(mg) * 100:.1f}"
+                else:
+                    mg_str = "margin=N/A"
+                lines.append(f"  {yr}: {tv_str} | {dp_str} | {rp_str} | {mg_str}")
+
+            # TREND summary line — synthesized from trend_direction + total_swing_pp
+            td = er.get("trend_direction", "stable")
+            ts = er.get("total_swing_pp")
+            if ts is not None and len(ch) >= 2:
+                first_yr = ch[0]["year"]
+                last_yr  = ch[-1]["year"]
+                first_mg = ch[0].get("margin")
+                last_mg  = ch[-1].get("margin")
+
+                def _mg_label(m: Optional[float]) -> str:
+                    if m is None:
+                        return "N/A"
+                    p = "D" if m >= 0 else "R"
+                    return f"{p}+{abs(m) * 100:.1f}"
+
+                swing_dir = "toward Democrats" if ts > 0 else "toward Republicans"
+                lines.append(
+                    f"  TREND: {td} — {abs(ts):.1f}pp D-margin swing {swing_dir} "
+                    f"from {first_yr} ({_mg_label(first_mg)}) to {last_yr} ({_mg_label(last_mg)})"
+                )
+
         blocks.append("\n".join(lines))
 
     precincts_entry = _get_entry(structured_data, "precincts")
@@ -1119,9 +1162,13 @@ Required H2 sections (use these exact titles):
 Write two paragraphs. First: the national stakes — draw specifically from opposition
 research findings if available (documented issue vulnerabilities by name, e.g. votes to
 cut Medicare, tariff positions, housing policy positions — do not write generically about
-"the stakes"). Second: the district-specific stakes — use election results data:
-competitiveness classification, historical margins, trend direction, and why holding
-or flipping this seat matters for the balance of power.
+"the stakes"). Second: the district-specific stakes — use the ELECTION HISTORY block to
+write with specific years and margins: name the actual margin in the earliest available
+cycle, the margin in the most recent cycle, and the total swing in percentage points.
+For example: 'In 2014 this district was R+29.7; by 2022 that margin had narrowed to
+R+1.5 — a 28-point Democratic swing over eight years.' Also state the competitiveness
+classification and why holding or flipping this seat matters for the balance of power.
+Do not write vague phrases like 'margins have been narrowing' without citing the actual figures.
 Then include these two placeholder blocks exactly as written (on their own lines):
 [FILL IN: Add your organization's specific mission and why this race connects to your long-term goals. What does winning mean for the communities you serve?]
 [FILL IN: Add any local or state-level context that makes this race particularly important for your organization — ballot initiatives, down-ballot races, coalition commitments, etc.]
@@ -1137,8 +1184,12 @@ Write 3–4 sentences using ELECTION RESULTS DATA. Cover all four points:
   (e.g. 'D 54.2% / R 45.8%, a D+8.4 margin'). If MEDSL party-level data is
   unavailable, say so explicitly and describe what data IS available (e.g.
   competitiveness rating, Cook PVI) rather than writing generic text.
-- Trend direction: if a trend line is present state the direction and the
-  underlying margin movement. If no trend data is available, say so.
+- Trend direction: use the ELECTION HISTORY block to describe the arc with
+  specific years and margins — do NOT write vague phrases like 'margins have been
+  narrowing' without the actual numbers. For example: 'In 2014 the Republican
+  margin was R+29.7, but by 2022 it had narrowed to R+1.5 — a 28-point swing
+  toward Democrats over eight years, with a slight R+0.9 pullback in 2024.'
+  If no ELECTION HISTORY data is available, say so explicitly.
 - Win number context: given the win number from WIN NUMBER DATA, how close
   was the actual last-cycle result to that threshold — comfortable, narrow, or
   a loss that defines the gap we must close?

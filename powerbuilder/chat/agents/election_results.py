@@ -564,12 +564,15 @@ def election_results_node(state: AgentState) -> dict:
     # ------------------------------------------------------------------
     # 4. Compute analytics
     # ------------------------------------------------------------------
-    most_recent     = None
-    latest          = None   # Series for the most-recent-cycle row; promoted to top-level structured fields
+    most_recent       = None
+    latest            = None   # Series for the most-recent-cycle row; promoted to top-level structured fields
     climate_breakdown = None
-    trend_note      = "Insufficient data for trend analysis."
-    competitiveness = "Unknown"
-    avg_margin      = None
+    trend_note        = "Insufficient data for trend analysis."
+    competitiveness   = "Unknown"
+    avg_margin        = None
+    cycle_history:    list          = []   # all cycles sorted ascending — for LLM trend narrative
+    trend_direction:  str           = "stable"
+    total_swing_pp:   Optional[float] = None  # pp change from first to last available cycle
 
     if margin_df is not None and not margin_df.empty:
         # Most recent cycle with party data — use idxmax() so the row selection is
@@ -619,6 +622,35 @@ def election_results_node(state: AgentState) -> dict:
                     "n":           len(subset),
                     "cycles":      sorted(subset["year"].tolist()),
                 }
+
+        # Build cycle_history: all available cycles sorted ascending.
+        # Used by export.py to produce a per-year ELECTION HISTORY block for the LLM.
+        _ch_ordered = margin_df.sort_values("year")
+        for _, _ch_row in _ch_ordered.iterrows():
+            _d = _ch_row.get("dem_pct")
+            _r = _ch_row.get("rep_pct")
+            _m = _ch_row.get("margin")
+            _t = _ch_row.get("totalvotes")
+            cycle_history.append({
+                "year":       int(_ch_row["year"]),
+                "totalvotes": int(_t)            if pd.notna(_t) else None,
+                "dem_pct":    round(float(_d), 4) if pd.notna(_d) else None,
+                "rep_pct":    round(float(_r), 4) if pd.notna(_r) else None,
+                "margin":     round(float(_m), 4) if pd.notna(_m) else None,
+            })
+
+        # Derive trend_direction and total_swing_pp from first → last cycle.
+        if len(cycle_history) >= 2:
+            _first_m = cycle_history[0]["margin"]
+            _last_m  = cycle_history[-1]["margin"]
+            if _first_m is not None and _last_m is not None:
+                total_swing_pp = round((_last_m - _first_m) * 100, 1)
+                if abs(total_swing_pp) < 2.0:
+                    trend_direction = "stable"
+                elif total_swing_pp > 0:
+                    trend_direction = "trending Democratic"
+                else:
+                    trend_direction = "trending Republican"
 
     elif master_df is not None and not master_df.empty:
         # Fallback: most recent turnout from master CSV (no party data)
@@ -707,6 +739,11 @@ def election_results_node(state: AgentState) -> dict:
         "avg_margin":       round(avg_margin, 4) if avg_margin is not None else None,
         "most_recent":      most_recent,
         "climate_breakdown": climate_breakdown,
+        # Full per-cycle history for LLM trend narrative (sorted ascending by year).
+        # Each entry: {year, totalvotes, dem_pct, rep_pct, margin}
+        "cycle_history":   cycle_history,
+        "trend_direction": trend_direction,
+        "total_swing_pp":  total_swing_pp,
         "party_data_available": (
             most_recent is not None and most_recent.get("dem_pct") is not None
         ),
