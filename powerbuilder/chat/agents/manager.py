@@ -79,12 +79,22 @@ def _detect_demographic_intent(query: str) -> str:
     q = query.lower()
     matches: list = []
 
+    # Broad umbrella terms — expand to all four racial/ethnic groups so that
+    # "nonwhite voters" or "communities of color" produces combined targeting
+    # rather than silently falling through to a single group.
+    # Placed BEFORE the individual race checks; any duplicates from a query that
+    # contains both an umbrella term and a specific race keyword (e.g. "hispanic
+    # poc voters") are collapsed by the dedup step before the return.
+    if any(kw in q for kw in ("nonwhite", "non-white", "people of color", "poc", "bipoc", "communities of color", "voters of color")):
+        for _r in ("hispanic", "black", "aapi", "native"):
+            matches.append(_r)
+
     # "college student" for youth; plain "college" omitted to avoid conflict with "college educated"
-    if any(kw in q for kw in ("young voter", "youth", "student", "college student", "millennial", "gen z", "young people")):
+    if any(kw in q for kw in ("young voter", "young voters", "young", "youth", "student", "college student", "millennial", "gen z", "young people")):
         matches.append("youth")
     if any(kw in q for kw in ("hispanic", "latino", "latina", "latinx", "spanish-speaking", "spanish speaking")):
         matches.append("hispanic")
-    if any(kw in q for kw in ("black voter", "black voters", "african american", "hbcu")):
+    if any(kw in q for kw in ("black voter", "black voters", "black", "black community", "black residents", "african american", "hbcu")):
         matches.append("black")
     if any(kw in q for kw in ("asian", "aapi", "asian american", "pacific islander", "korean", "chinese", "vietnamese", "filipino", "japanese", "south asian", "indian american")):
         matches.append("aapi")
@@ -111,7 +121,11 @@ def _detect_demographic_intent(query: str) -> str:
 
     if not matches:
         return "default"
-    return "+".join(matches)
+    # Deduplicate while preserving insertion order — broad umbrella terms may add
+    # groups that a subsequent specific-race check also appends (e.g. "hispanic poc").
+    seen: set = set()
+    deduped = [m for m in matches if m not in seen and not seen.add(m)]  # type: ignore[func-returns-value]
+    return "+".join(deduped)
 
 # Language detection — keyword scan for explicit language requests in the user query.
 # Returns ISO 639-1 codes. "en" is the default when no other language is requested.
