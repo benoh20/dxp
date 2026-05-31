@@ -105,6 +105,7 @@ _POWER_TYPE_KEYWORDS = {
         "election", "electoral", "voter", "vote", "ballot", "precinct",
         "turnout", "primary", "general election", "candidate", "campaign",
         "district", "win number", "gotv", "register", "poll", "political",
+        "persuasion", 
     ],
     "over": [
         "pressure", "target", "decision-maker", "decision maker",
@@ -117,7 +118,9 @@ _POWER_TYPE_KEYWORDS = {
         "deportation defense", "know your rights", "care work",
         "caregiv", "tenant", "union drive", "alternative", "build base",
         "base building", "leader development", "popular education",
-        "organiz", "grassroot", "basebuild", "volunteer", "issue",
+        "organiz", "grassroot", "basebuild", "volunteer program", "issue campaign",
+        "issue organizing", "community organizing", "volunteer base",
+        "volunteer recruitment"
     ],
 }
 
