@@ -104,12 +104,12 @@ _POWER_TYPE_KEYWORDS = {
     "through": [
         "election", "electoral", "voter", "vote", "ballot", "precinct",
         "turnout", "primary", "general election", "candidate", "campaign",
-        "district", "win number", "gotv", "register", "poll",
+        "district", "win number", "gotv", "register", "poll", "political",
     ],
     "over": [
         "pressure", "target", "decision-maker", "decision maker",
         "protest", "march", "rally", "boycott", "escalat", "disrupt",
-        "corporate", "council", "city hall", "sit-in", "strike",
+        "corporate", "city hall", "sit-in", "strike", "accountability",
         "legislator", "lobby", "demand", "accountab",
     ],
     "with": [
@@ -117,6 +117,7 @@ _POWER_TYPE_KEYWORDS = {
         "deportation defense", "know your rights", "care work",
         "caregiv", "tenant", "union drive", "alternative", "build base",
         "base building", "leader development", "popular education",
+        "organiz", "grassroot", "basebuild", "volunteer", "issue",
     ],
 }
 
