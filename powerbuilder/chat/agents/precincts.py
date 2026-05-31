@@ -1015,6 +1015,11 @@ TOP_N: [integer number of precincts to return, default 20]
         # Combined intents (e.g. "black+hispanic") are joined with "+" and split here.
         demographic_intent = (state.get("demographic_intent") or "default").lower()
         intents = demographic_intent.split("+") if "+" in demographic_intent else [demographic_intent]
+        logger.info(
+            "PrecinctsAgent.run: demographic_intent=%r  intents=%r  "
+            "(raw state value: %r)",
+            demographic_intent, intents, state.get("demographic_intent"),
+        )
 
         # Collect the union of metrics across all matched intents (order preserved, deduplicated)
         metrics: list = []
@@ -1027,6 +1032,11 @@ TOP_N: [integer number of precincts to return, default 20]
             for m in intent_metrics:
                 if m not in metrics:
                     metrics.append(m)
+
+        logger.info(
+            "PrecinctsAgent.run: metrics=%r  combined_primary_metrics=%r",
+            metrics, combined_primary_metrics,
+        )
 
         if len(intents) > 1:
             demographic_profile = " | ".join(
@@ -1089,6 +1099,10 @@ TOP_N: [integer number of precincts to return, default 20]
             }
 
         precincts           = output["precincts"]
+        logger.info(
+            "PrecinctsAgent.run: sample precinct keys: %r",
+            list(precincts[0].keys()) if precincts else [],
+        )
         precinct_count      = output["precinct_count"]
         data_quality_note   = output["data_quality_note"]
         tract_fallback_used = output.get("tract_fallback_used", False)
