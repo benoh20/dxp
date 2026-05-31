@@ -105,13 +105,14 @@ _POWER_TYPE_KEYWORDS = {
         "election", "electoral", "voter", "vote", "ballot", "precinct",
         "turnout", "primary", "general election", "candidate", "campaign",
         "district", "win number", "gotv", "register", "poll", "political",
-        "persuasion", 
+        "persuasion", "mobilization", 
     ],
     "over": [
-        "pressure", "target", "decision-maker", "decision maker",
+        "pressure", "decision-maker", "decision maker",
         "protest", "march", "rally", "boycott", "escalat", "disrupt",
         "corporate", "city hall", "sit-in", "strike", "accountability",
-        "legislator", "lobby", "demand", "accountab",
+        "legislator", "lobby", "demand", "accountab", "council",
+        "direct action", "issue advocacy", "mass mobiliz", 
     ],
     "with": [
         "mutual aid", "co-op", "cooperative", "community fridge",
