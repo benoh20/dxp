@@ -373,6 +373,8 @@ _PRECINCT_HEADER_LABELS: dict[str, str] = {
     "senior_vap":         "Senior VAP (65+)",
     "youth_vap":          "Youth VAP (18-29)",
     "college_enrolled":   "College Enrolled",
+    # Economic
+    "median_income":      "Median Household Income",
     # Summary columns (always last)
     "total_vap":              "Total VAP",
     "target_demographic_vap": "Target Demo VAP",
@@ -402,6 +404,12 @@ def _precinct_table(precincts: list) -> tuple:
                        if k in all_keys]
     metric_keys = individual_cols + summary_cols
 
+    # When median_income is a metric, target_demographic_vap also carries an income
+    # value (the weighted income of the dominant group) and must be formatted as
+    # currency rather than a population count.
+    _is_income_query = "median_income" in precincts[0]
+    _currency_cols: set = {"median_income"} | ({"target_demographic_vap"} if _is_income_query else set())
+
     headers = [
         "Precinct",
         *[_PRECINCT_HEADER_LABELS.get(k, k.replace("_", " ").title()) for k in metric_keys],
@@ -414,6 +422,8 @@ def _precinct_table(precincts: list) -> tuple:
             if isinstance(val, (int, float)):
                 if k.endswith("_pct"):
                     formatted = f"{float(val):.2f}%"
+                elif k in _currency_cols:
+                    formatted = f"${float(val):,.0f}"
                 else:
                     formatted = f"{float(val):,.0f}"
             else:

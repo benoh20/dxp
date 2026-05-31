@@ -189,9 +189,10 @@ TARGETING_VARS: dict[str, str] = {
     # Education — TRACT LEVEL ONLY (see TRACT_ONLY_METRICS)
     "bachelors_degree": "B15003_022E",  # Bachelor's degree
     # Economic
-    "poverty_pop":  "B17001_002E",  # Households below poverty line (alias for poverty_total)
-    "owner_pop":    "B25003_002E",  # Owner-occupied units (alias for homeowners)
-    "renter_pop":   "B25003_003E",  # Renter-occupied units
+    "poverty_pop":   "B17001_002E",  # Households below poverty line (alias for poverty_total)
+    "median_income": "B19013_001E",  # Median household income — continuous variable; format as currency
+    "owner_pop":     "B25003_002E",  # Owner-occupied units (alias for homeowners)
+    "renter_pop":    "B25003_003E",  # Renter-occupied units
     # Veterans
     "veteran_pop":  "B21001_002E",  # Civilian veterans (B21001)
     # VAP alias for default targeting (crosswalk-native, same underlying data as "vap")

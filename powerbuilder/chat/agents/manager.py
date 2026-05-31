@@ -100,13 +100,19 @@ def _detect_demographic_intent(query: str) -> str:
         matches.append("aapi")
     if any(kw in q for kw in ("native american", "indigenous", "tribal", "american indian", "alaska native")):
         matches.append("native")
-    if any(kw in q for kw in ("senior", "elderly", "older voter", "retiree", "65 plus", "65+", "aarp")):
+    if any(kw in q for kw in ("senior", "elderly", "older voter", "retiree", "65 plus", "65+", "aarp", "older")):
         matches.append("senior")
-    if any(kw in q for kw in ("college educated", "educated voter", "degree holder", "professional class")):
-        matches.append("educated")
-    if any(kw in q for kw in ("working class", "blue collar", "no college", "trade worker", "union")):
+    if any(kw in q for kw in ("college educated", "college graduate", "college grad", "four year degree", "4 year degree", "degree holder", "professional class", "white collar")):
+        matches.append("college")
+    if any(kw in q for kw in ("no college", "non-college", "noncollege", "without a degree", "no degree", "trade worker", "vocational", "some college", "did not graduate college")):
+        matches.append("noncollege")
+    if any(kw in q for kw in ("working class", "blue collar", "hourly worker", "wage worker", "labor", "working families", "working people")):
         matches.append("working_class")
-    if any(kw in q for kw in ("low income", "poverty", "poor", "economically disadvantaged", "public housing")):
+    if any(kw in q for kw in ("middle class", "middle-class", "moderate income", "median income", "middle income")):
+        matches.append("middle_class")
+    if any(kw in q for kw in ("union", "union household", "union member", "organized labor", "union worker", "union families")):
+        matches.append("union")
+    if any(kw in q for kw in ("low income", "poverty", "poor", "economically disadvantaged", "public housing", "low wage", "minimum wage", "working poor")):
         matches.append("low_income")
     if any(kw in q for kw in ("high income", "wealthy", "affluent", "upper income", "high earner")):
         matches.append("high_income")

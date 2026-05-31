@@ -31,16 +31,38 @@ _DEMOGRAPHIC_METRICS: dict[str, list[str]] = {
     "aapi":          ["aapi"],
     "native":        ["native_pop"],
     "senior":        ["senior_vap"],
-    "educated":      ["graduate_educated"],
-    "working_class": ["no_hs_diploma", "some_college"],
+    # Education (tract-level — routed through the B15003 tract path)
+    "college":       ["bachelors_degree"],
+    "noncollege":    ["some_college", "no_hs_diploma"],
+    # Economic / class (median_income used as proxy; sort direction set in _DEMOGRAPHIC_SORT)
+    "working_class": ["median_income"],   # sorted ascending: lowest-income precincts first
+    "middle_class":  ["median_income"],   # sorted by proximity to district median
     "low_income":    ["poverty_pop"],
-    "high_income":   ["median_income"],
+    "high_income":   ["median_income"],   # sorted descending: highest-income precincts first
+    # Union: no Census block-group equivalent — falls back to total VAP default
+    "union":         ["total_vap"],
     "immigrant":     ["foreign_born_pop"],
     "veteran":       ["veteran_pop"],
     "suburban":      ["owner_pop"],
     "renter":        ["renter_pop"],
     "default":       ["total_vap"],
 }
+
+# Sort direction overrides for income-proxy intents.
+# "ascending"  → rank lowest-value precincts first (working_class: lowest income)
+# "proximity"  → rank by |value − district_mean| ascending (middle_class: closest to average)
+# All other intents default to descending (highest concentration first).
+_DEMOGRAPHIC_SORT: dict[str, str] = {
+    "working_class": "ascending",
+    "middle_class":  "proximity",
+}
+
+# Rate variables: continuous measures (not counts) that require population-weighted
+# averaging instead of dasymetric summing during precinct reaggregation.
+# Summing a rate across area fractions produces a meaningless number — e.g.
+# summing median_income × area_weight gives "fraction-weighted income" rather than
+# an income estimate. These variables are handled separately in step 6a.
+RATE_VARS: frozenset = frozenset({"median_income"})
 
 # Human-readable explanation written into structured_data["demographic_profile"].
 _DEMOGRAPHIC_PROFILES: dict[str, str] = {
@@ -70,16 +92,26 @@ _DEMOGRAPHIC_PROFILES: dict[str, str] = {
         "Targeting precincts with high concentrations of voters aged 65 and older. "
         "senior_vap sums B01001_020-025E (male 65+) and B01001_044-049E (female 65+)."
     ),
-    "educated": (
-        "Targeting precincts with high concentrations of college and graduate degree holders. "
-        "graduate_educated combines bachelor's (B15003_022E) with master's, professional, "
-        "and doctoral degrees (B15003_023-025E). Uses tract-level data — less granular than "
-        "block-group targeting."
+    "college": (
+        "Targeting precincts with high concentrations of college degree holders. "
+        "Uses bachelor's degree (B15003_022E) as the primary metric. "
+        "Tract-level data — less granular than block-group targeting."
+    ),
+    "noncollege": (
+        "Targeting precincts with high concentrations of non-college voters. "
+        "Combines some college / associate's (B15003_019-021E) and no high-school diploma "
+        "(B15003_002-016E). Both are tract-level — less granular than block-group targeting."
     ),
     "working_class": (
-        "Targeting precincts with high concentrations of working-class voters without "
-        "four-year degrees. no_hs_diploma sums B15003_002-016E; some_college sums "
-        "B15003_019-021E. Both use tract-level data — less granular than block-group targeting."
+        "Targeting precincts by median household income as a proxy for working-class "
+        "concentration. Precincts are ranked lowest-income first (B19013_001E ascending). "
+        "Note: median income is an approximation — it does not directly measure occupation "
+        "or union membership."
+    ),
+    "middle_class": (
+        "Targeting precincts closest to the district-wide median household income "
+        "(B19013_001E). Precincts are ranked by how little they deviate from the district "
+        "average — an approximation of middle-income concentration."
     ),
     "low_income": (
         "Targeting precincts with high concentrations of low-income households "
@@ -88,6 +120,10 @@ _DEMOGRAPHIC_PROFILES: dict[str, str] = {
     "high_income": (
         "Targeting precincts with high median household income (B19013_001E) — "
         "for donor prospecting and persuasion targeting in affluent areas."
+    ),
+    "union": (
+        "Union household targeting is not available from Census block-group data. "
+        "Precincts are shown ranked by total voting-age population instead."
     ),
     "immigrant": (
         "Targeting precincts with high concentrations of foreign-born and naturalized "
@@ -626,6 +662,7 @@ class PrecinctsAgent:
         metrics: List[str] = None,
         top_n: int = 20,
         combined_primary_metrics: List[str] = None,
+        sort_mode: str = "descending",
     ) -> list:
         """
         Returns the top N precincts ranked by the first metric in the list.
@@ -794,8 +831,18 @@ class PrecinctsAgent:
 
         # 6. Apply dasymetric weights per metric and reaggregate by precinct
         # weighted_value = block_group_value * (intersection_area / bg_total_area)
-        # Do not change this logic
+        # Rate variables (RATE_VARS) are skipped here and handled in step 6a.
+
+        # 6-pre. Clean Census sentinel values for rate variables.
+        # Census reports -666666666 for suppressed BG data; values > $500k are data errors.
         for friendly_name, census_code in metric_to_code.items():
+            if friendly_name in RATE_VARS and census_code in merged.columns:
+                _col = pd.to_numeric(merged[census_code], errors="coerce")
+                merged[census_code] = _col.where((_col >= 0) & (_col <= 500_000), other=float("nan"))
+
+        for friendly_name, census_code in metric_to_code.items():
+            if friendly_name in RATE_VARS:  # handled separately in step 6a
+                continue
             if census_code in merged.columns:
                 merged[f"weighted_{friendly_name}"] = (
                     pd.to_numeric(merged[census_code], errors="coerce").fillna(0)
@@ -827,6 +874,38 @@ class PrecinctsAgent:
         precinct_totals = precinct_totals.join(boundary_flags)
         precinct_totals["approximate_boundary"] = ~precinct_totals["all_official"].fillna(False)
         precinct_totals = precinct_totals.drop(columns=["all_official"])
+
+        # 6a. Rate variable reaggregation: VAP-weighted average instead of sum.
+        # Formula per precinct: Σ(rate_i × weight_i × vap_i) / Σ(weight_i × vap_i)
+        # Sentinel values were cleaned in step 6-pre; NaN BGs are excluded from both numerator and denominator.
+        _rate_metric_codes = {fn: cc for fn, cc in metric_to_code.items() if fn in RATE_VARS}
+        if _rate_metric_codes:
+            _bg_vap_series = (
+                pd.to_numeric(merged["bg_vap"], errors="coerce").fillna(0)
+                if "bg_vap" in merged.columns
+                else pd.Series(0.0, index=merged.index)
+            )
+            _vap_wt = _bg_vap_series * merged["weight"]
+            for _fn, _cc in _rate_metric_codes.items():
+                if _cc not in merged.columns:
+                    logger.warning("Column '%s' not found in Census data; skipping rate metric '%s'.", _cc, _fn)
+                    continue
+                _rate = pd.to_numeric(merged[_cc], errors="coerce")  # sentinels already NaN from 6-pre
+                _valid = _rate.notna()
+                # numerator rows: rate × vap_weight (NaN for invalid BGs → excluded from groupby sum)
+                merged["_rate_num"] = (_rate * _vap_wt).where(_valid, other=float("nan"))
+                # denominator rows: vap_weight where income is valid, else 0
+                merged["_rate_den"] = _vap_wt.where(_valid, other=0.0)
+                _agg = merged.groupby("precinct_geoid")[["_rate_num", "_rate_den"]].sum(min_count=1)
+                _result = (_agg["_rate_num"] / _agg["_rate_den"].replace(0.0, float("nan"))).round(2)
+                # Cap: negative or above $500k → NaN (excluded from income-based ranking)
+                _result = _result.where((_result > 0) & (_result <= 500_000), other=float("nan"))
+                precinct_totals[f"weighted_{_fn}"] = _result
+                logger.debug(
+                    "PrecinctsAgent: rate reaggregation for '%s' — %d precincts have valid income data",
+                    _fn, int(_result.notna().sum()),
+                )
+            merged.drop(columns=["_rate_num", "_rate_den"], errors="ignore", inplace=True)
 
         # 6b. Tract-level education metrics (B15003 — not available at block group in ACS5).
         # Fetches tract data, derives tract→precinct weights from the crosswalk, and joins
@@ -864,7 +943,12 @@ class PrecinctsAgent:
 
         use_combined_target = "weighted_combined_target" in precinct_totals.columns
 
-        # 7. Rank by combined target (multi-demo) or primary metric (single demo)
+        # 7. Rank by combined target (multi-demo) or primary metric (single demo).
+        # sort_mode controls direction:
+        #   "descending" — highest value first (default; all count-based metrics)
+        #   "ascending"  — lowest value first (working_class: lowest-income precincts)
+        #   "proximity"  — closest to district mean first (middle_class: near-average income)
+        # sort_mode is ignored for combined multi-demographic queries (always descending).
         if use_combined_target:
             sort_col = "weighted_combined_target"
         elif f"weighted_{metrics[0]}" in precinct_totals.columns:
@@ -873,7 +957,17 @@ class PrecinctsAgent:
             sort_col = None
 
         if sort_col:
-            precinct_totals = precinct_totals.sort_values(sort_col, ascending=False)
+            effective_sort = sort_mode if not use_combined_target else "descending"
+            if effective_sort == "ascending":
+                precinct_totals = precinct_totals.sort_values(sort_col, ascending=True)
+            elif effective_sort == "proximity":
+                # Middle-class proxy: rank by absolute deviation from district mean income.
+                _district_mean = precinct_totals[sort_col].mean()
+                precinct_totals = precinct_totals.assign(
+                    _deviation=(precinct_totals[sort_col] - _district_mean).abs()
+                ).sort_values("_deviation", ascending=True).drop(columns=["_deviation"])
+            else:
+                precinct_totals = precinct_totals.sort_values(sort_col, ascending=False)
 
         # Count total unique precincts in crosswalk before truncating to top_n.
         # Used for data quality check below.
@@ -904,7 +998,12 @@ class PrecinctsAgent:
                     continue
                 wcol = f"weighted_{metric}"
                 if wcol in row.index:
-                    record[metric] = round(float(row[wcol]), 2)
+                    _mv = row[wcol]
+                    record[metric] = (
+                        round(float(_mv), 2)
+                        if _mv is not None and not pd.isna(_mv)
+                        else None
+                    )
 
             # For combined targeting, guarantee each primary metric has an entry.
             # The loop above covers them when weighted columns exist; this fallback
@@ -922,16 +1021,29 @@ class PrecinctsAgent:
                 # weighted_combined_target = max(primary1, primary2) — no cap needed.
                 target_val = float(row.get("weighted_combined_target", 0) or 0)
             else:
-                target_val = float(row.get(f"weighted_{metrics[0]}", 0) or 0)
+                _raw_target = row.get(f"weighted_{metrics[0]}")
+                target_val = (
+                    float(_raw_target)
+                    if _raw_target is not None and not pd.isna(_raw_target)
+                    else 0.0
+                )
+
+            # Rate variables (e.g. median_income) store a dollar amount in target_demographic_vap;
+            # target_demographic_pct / penetration_rate are not meaningful in that case.
+            _is_rate_primary = (not use_combined_target) and bool(metrics) and (metrics[0] in RATE_VARS)
 
             record["total_vap"]              = round(total_vap_val, 2)
             record["target_demographic_vap"] = round(target_val, 2)
-            record["target_demographic_pct"] = (
-                round(target_val / total_vap_val * 100, 2) if total_vap_val > 0 else 0.0
-            )
-            record["penetration_rate"] = (
-                round(target_val / total_vap_val, 4) if total_vap_val > 0 else 0.0
-            )
+            if _is_rate_primary:
+                record["target_demographic_pct"] = None
+                record["penetration_rate"]       = None
+            else:
+                record["target_demographic_pct"] = (
+                    round(target_val / total_vap_val * 100, 2) if total_vap_val > 0 else 0.0
+                )
+                record["penetration_rate"] = (
+                    round(target_val / total_vap_val, 4) if total_vap_val > 0 else 0.0
+                )
             record["approximate_boundary"] = bool(row.get("approximate_boundary", False))
             results.append(record)
 
@@ -1046,6 +1158,16 @@ TOP_N: [integer number of precincts to return, default 20]
             demographic_profile = _DEMOGRAPHIC_PROFILES.get(demographic_intent, _DEMOGRAPHIC_PROFILES["default"])
             combined_primary_metrics = None  # single intent: no synthetic combined column needed
 
+        # Sort mode — only meaningful for single-intent income-proxy queries.
+        # Combined multi-demographic queries always use the default descending sort.
+        sort_mode = "descending"
+        if len(intents) == 1:
+            sort_mode = _DEMOGRAPHIC_SORT.get(intents[0], "descending")
+
+        # Union intent: no Census block-group data available.
+        # Flag it now so we can attach the targeting_note after get_top_precincts().
+        has_union_intent = "union" in intents
+
         try:
             dist_num = normalize_district(params.get("DISTRICT_NUM", 0))
             top_n    = int(params.get("TOP_N", 20))
@@ -1064,6 +1186,7 @@ TOP_N: [integer number of precincts to return, default 20]
         output = PrecinctsAgent.get_top_precincts(
             state_fips, geoid, district_type, metrics, top_n,
             combined_primary_metrics=combined_primary_metrics,
+            sort_mode=sort_mode,
         )
 
         # Coverage-miss path: crosswalk file doesn't exist yet for this district.
@@ -1135,6 +1258,12 @@ TOP_N: [integer number of precincts to return, default 20]
                 "College enrollment (B14001_005E) and/or education attainment (B15003) "
                 "data were sourced from Census tract level (ACS5 block-group data unavailable). "
                 "Results are less spatially granular than block-group targeting."
+            )
+
+        if has_union_intent:
+            state_update["structured_data"][0]["targeting_note"] = (
+                "Union household targeting is not available from Census block-group data — "
+                "showing all voters in the district instead."
             )
 
         if len(intents) > 1:
