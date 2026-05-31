@@ -564,11 +564,12 @@ def election_results_node(state: AgentState) -> dict:
     # ------------------------------------------------------------------
     # 4. Compute analytics
     # ------------------------------------------------------------------
-    most_recent  = None
+    most_recent     = None
+    latest          = None   # Series for the most-recent-cycle row; promoted to top-level structured fields
     climate_breakdown = None
-    trend_note   = "Insufficient data for trend analysis."
+    trend_note      = "Insufficient data for trend analysis."
     competitiveness = "Unknown"
-    avg_margin   = None
+    avg_margin      = None
 
     if margin_df is not None and not margin_df.empty:
         # Most recent cycle with party data — use idxmax() so the row selection is
@@ -629,6 +630,16 @@ def election_results_node(state: AgentState) -> dict:
             "margin":     None,
             "totalvotes": int(latest.get("totalvotes", 0)),
         }
+
+    if latest is None:
+        logger.warning(
+            "ElectionAnalyst: could not resolve most-recent-cycle row for district=%s "
+            "(margin_df=%s, master_df=%s) — dem_pct/rep_pct/most_recent_year will be "
+            "None in structured output",
+            district_id,
+            "None" if margin_df is None else f"{len(margin_df)} rows",
+            "None" if master_df is None else f"{len(master_df)} rows",
+        )
 
     # ------------------------------------------------------------------
     # 5. Cook Political Report (optional)
@@ -699,6 +710,18 @@ def election_results_node(state: AgentState) -> dict:
         "party_data_available": (
             most_recent is not None and most_recent.get("dem_pct") is not None
         ),
+        # Top-level shortcuts so consumers don't have to drill into most_recent.
+        "dem_pct": (
+            round(float(latest["dem_pct"]), 4)
+            if latest is not None and not pd.isna(latest.get("dem_pct"))
+            else None
+        ),
+        "rep_pct": (
+            round(float(latest["rep_pct"]), 4)
+            if latest is not None and not pd.isna(latest.get("rep_pct"))
+            else None
+        ),
+        "most_recent_year": int(latest["year"]) if latest is not None else None,
         "cook_pvi":         cook.get("cook_pvi"),
         "race_rating":      cook.get("race_rating"),
         "incumbent":        cook.get("incumbent"),
