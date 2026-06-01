@@ -12,6 +12,8 @@ langgraph>=0.2.0        # The Orchestrator engine
 langchain>=0.3.0        # Foundational AI components
 langchain-openai>=0.2.0 # OpenAI specific integration
 langchain-community>=0.3.0 # Extra community tools (like PDF loaders)
+langchain-anthropic==1.4.4
+langchain-google-genai==4.2.4
 
 # Vector Database
 pinecone-client>=4.1.0  # Pinecone Python SDK
