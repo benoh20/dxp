@@ -25,8 +25,8 @@ msgid "Full plan"
 msgstr "Plan completo"
 
 #: chat/demo_tiles.py:79
-msgid "Gwinnett GOTV, Latinx 18 to 35"
-msgstr "GOTV en Gwinnett, latinxs de 18 a 35"
+msgid "AZ-06 GOTV, Latinx 18 to 35"
+msgstr "GOTV en AZ-06, latinxs de 18 a 35"
 
 #: chat/demo_tiles.py:80
 msgid "Spanish door-knock script and a CSV target list."
@@ -34,10 +34,10 @@ msgstr "Guion de puerta a puerta en español y un CSV de la lista objetivo."
 
 #: chat/demo_tiles.py:82
 msgid ""
-"Build a Gwinnett County GOTV plan targeting Latinx voters age 18 to 35. "
+"Build a GOTV plan for Arizona's 6th Congressional District targeting Latinx voters age 18 to 35. "
 "Generate a Spanish door-knock script and give me a CSV of the target list."
 msgstr ""
-"Crea un plan de GOTV en el condado de Gwinnett dirigido a votantes latinxs "
+"Crea un plan de GOTV para el 6.º Distrito del Congreso de Arizona dirigido a votantes latinxs "
 "de 18 a 35 años. Genera un guion de puerta a puerta en español y entrégame "
 "un CSV de la lista objetivo."
 
@@ -66,8 +66,8 @@ msgid "Opposition"
 msgstr "Oposición"
 
 #: chat/demo_tiles.py:102
-msgid "GOP opponent in GA-06"
-msgstr "Rival republicano en GA-06"
+msgid "GOP opponent in AZ-06"
+msgstr "Rival republicano en AZ-06"
 
 #: chat/demo_tiles.py:103
 msgid "Vulnerabilities and contrast angles from research books."
@@ -77,12 +77,12 @@ msgstr ""
 
 #: chat/demo_tiles.py:105
 msgid ""
-"Pull opposition research on the Republican candidate in Georgia's 6th "
+"Pull opposition research on the Republican candidate in Arizona's 6th "
 "Congressional District. Give me the top vulnerabilities and three contrast "
 "messaging angles."
 msgstr ""
 "Extrae investigación de oposición sobre el candidato republicano del 6.º "
-"distrito del Congreso de Georgia. Dame las principales vulnerabilidades y "
+"distrito del Congreso de Arizona. Dame las principales vulnerabilidades y "
 "tres ángulos de mensaje de contraste."
 
 #: chat/demo_tiles.py:112
@@ -99,11 +99,11 @@ msgstr "Prueba la detección de idioma y el agente de mensajería."
 
 #: chat/demo_tiles.py:117
 msgid ""
-"Draft a Vietnamese-language text message to AAPI voters in Gwinnett about "
+"Draft a Vietnamese-language text message to AAPI voters in Georgia's 6th Congressional District about "
 "early voting locations and hours."
 msgstr ""
-"Redacta un mensaje de texto en vietnamita para votantes AAPI en Gwinnett "
-"sobre los lugares y horarios de votación anticipada."
+"Redacta un mensaje de texto en vietnamita para votantes AAPI en el 6.º "
+"Distrito del Congreso de Georgia sobre los lugares y horarios de votación anticipada."
 
 #: chat/demo_tiles.py:123
 msgid "Social pack"

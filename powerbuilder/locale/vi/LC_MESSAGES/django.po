@@ -5,7 +5,7 @@
 # of formal mailers). Tone is warm and direct. Vietnamese organizing-tone
 # formality registers vary by region and generation, so this draft MUST be
 # reviewed by a native speaker familiar with the target community
-# (Vietnamese American voters in Gwinnett County / GA-07) before launch.
+# (Vietnamese American voters in AZ-06 / GA-06 / GA-07) before launch.
 # Do NOT translate proper nouns: Powerbuilder, OpenAI, Pinecone, Census
 # API, FEC, Gwinnett, Beta.
 #
@@ -28,8 +28,8 @@ msgid "Full plan"
 msgstr "Kế hoạch đầy đủ"
 
 #: chat/demo_tiles.py:79
-msgid "Gwinnett GOTV, Latinx 18 to 35"
-msgstr "Vận động đi bầu ở Gwinnett, cử tri Latinx 18 đến 35"
+msgid "AZ-06 GOTV, Latinx 18 to 35"
+msgstr "Vận động đi bầu ở AZ-06, cử tri Latinx 18 đến 35"
 
 #: chat/demo_tiles.py:80
 msgid "Spanish door-knock script and a CSV target list."
@@ -37,10 +37,10 @@ msgstr "Kịch bản gõ cửa bằng tiếng Tây Ban Nha và danh sách mục 
 
 #: chat/demo_tiles.py:82
 msgid ""
-"Build a Gwinnett County GOTV plan targeting Latinx voters age 18 to 35. "
+"Build a GOTV plan for Arizona's 6th Congressional District targeting Latinx voters age 18 to 35. "
 "Generate a Spanish door-knock script and give me a CSV of the target list."
 msgstr ""
-"Hãy xây dựng kế hoạch vận động đi bầu ở quận Gwinnett, hướng đến cử tri "
+"Hãy xây dựng kế hoạch vận động đi bầu cho Khu vực Quốc hội thứ 6 của Arizona, hướng đến cử tri "
 "Latinx từ 18 đến 35 tuổi. Tạo kịch bản gõ cửa bằng tiếng Tây Ban Nha và gửi "
 "cho tôi danh sách mục tiêu dạng CSV."
 
@@ -69,8 +69,8 @@ msgid "Opposition"
 msgstr "Đối thủ"
 
 #: chat/demo_tiles.py:102
-msgid "GOP opponent in GA-06"
-msgstr "Đối thủ Cộng hòa ở GA-06"
+msgid "GOP opponent in AZ-06"
+msgstr "Đối thủ Cộng hòa ở AZ-06"
 
 #: chat/demo_tiles.py:103
 msgid "Vulnerabilities and contrast angles from research books."
@@ -78,12 +78,12 @@ msgstr "Điểm yếu và các góc tương phản, lấy từ sổ nghiên cứ
 
 #: chat/demo_tiles.py:105
 msgid ""
-"Pull opposition research on the Republican candidate in Georgia's 6th "
+"Pull opposition research on the Republican candidate in Arizona's 6th "
 "Congressional District. Give me the top vulnerabilities and three contrast "
 "messaging angles."
 msgstr ""
 "Tra cứu nghiên cứu về ứng cử viên Cộng hòa ở Khu vực Quốc hội số 6 của "
-"Georgia. Liệt kê những điểm yếu chính và ba góc tin nhắn tương phản."
+"Arizona. Liệt kê những điểm yếu chính và ba góc tin nhắn tương phản."
 
 #: chat/demo_tiles.py:112
 msgid "Multilingual"
@@ -99,10 +99,10 @@ msgstr "Thử nghiệm phát hiện ngôn ngữ và tác nhân nhắn tin."
 
 #: chat/demo_tiles.py:117
 msgid ""
-"Draft a Vietnamese-language text message to AAPI voters in Gwinnett about "
+"Draft a Vietnamese-language text message to AAPI voters in Georgia's 6th Congressional District about "
 "early voting locations and hours."
 msgstr ""
-"Hãy soạn một tin nhắn tiếng Việt gửi cử tri AAPI ở Gwinnett về địa điểm và "
+"Hãy soạn một tin nhắn tiếng Việt gửi cử tri AAPI ở Khu vực Quốc hội thứ 6 của Georgia về địa điểm và "
 "giờ bỏ phiếu sớm."
 
 #: chat/demo_tiles.py:123

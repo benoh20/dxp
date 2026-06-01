@@ -73,13 +73,13 @@ class DemoTile(TypedDict):
 
 DEMO_TILES: list[DemoTile] = [
     {
-        "id":        "gwinnett-gotv-latinx",
+        "id":        "az-06-gotv-latinx",
         "chip":      _("Full plan"),
         "chip_kind": "plan",
-        "headline":  _("Gwinnett GOTV, Latinx 18 to 35"),
+        "headline":  _("AZ-06, Latinx 18 to 35"),
         "preview":   _("Spanish door-knock script and a CSV target list."),
         "prompt": _(
-            "Build a Gwinnett County GOTV plan targeting Latinx voters "
+            "Build a GOTV plan for Arizona's 6th Congressional District targeting Latinx voters "
             "age 18 to 35. Generate a Spanish door-knock script and give "
             "me a CSV of the target list."
         ),
@@ -96,14 +96,14 @@ DEMO_TILES: list[DemoTile] = [
         ),
     },
     {
-        "id":        "opp-research-ga06-gop",
+        "id":        "opp-research-az06-gop",
         "chip":      _("Opposition"),
         "chip_kind": "opp",
-        "headline":  _("GOP opponent in GA-06"),
+        "headline":  _("GOP opponent in AZ-06"),
         "preview":   _("Vulnerabilities and contrast angles from research books."),
         "prompt": _(
             "Pull opposition research on the Republican candidate in "
-            "Georgia's 6th Congressional District. Give me the top "
+            "Arizona's 6th Congressional District. Give me the top "
             "vulnerabilities and three contrast messaging angles."
         ),
     },
@@ -115,7 +115,7 @@ DEMO_TILES: list[DemoTile] = [
         "preview":   _("Tests language detection plus messaging agent."),
         "prompt": _(
             "Draft a Vietnamese-language text message to AAPI voters in "
-            "Gwinnett about early voting locations and hours."
+            "Georgia's 6th Congressional District about early voting locations and hours."
         ),
     },
     {

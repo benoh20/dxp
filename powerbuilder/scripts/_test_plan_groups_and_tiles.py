@@ -257,7 +257,7 @@ def test_demo_tiles_config():
     n += 1
 
     # Specific tiles known to exist (acts as a smoke test against accidental drops)
-    for needed in ("gwinnett-gotv-latinx", "win-number-ga07-midterm",
+    for needed in ("az-06-gotv-latinx", "win-number-ga07-midterm",
                    "voterfile-segment-and-match", "social-pack-ga07-youth"):
         assert needed in ids, f"missing expected tile id {needed!r}"
         n += 1
@@ -285,11 +285,11 @@ def test_demo_tiles_config():
 
         # Duplicate id is also dropped
         demo_tiles.DEMO_TILES.append({  # type: ignore[arg-type]
-            "id": "gwinnett-gotv-latinx", "chip": "Dup", "chip_kind": "plan",
+            "id": "az-06-gotv-latinx", "chip": "Dup", "chip_kind": "plan",
             "headline": "Duplicate", "preview": "p", "prompt": "q",
         })
         out = demo_tiles.get_demo_tiles()
-        assert sum(1 for t in out if t["id"] == "gwinnett-gotv-latinx") == 1
+        assert sum(1 for t in out if t["id"] == "az-06-gotv-latinx") == 1
         n += 1
     finally:
         demo_tiles.DEMO_TILES[:] = original
