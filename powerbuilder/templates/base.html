@@ -271,11 +271,21 @@
       text-transform: uppercase;
     ">{% trans "Beta" %}</span>
 
-    {# Language switcher (Milestone Q): a small POST form per language. #}
-    {# Sits inline in the nav so it shows on every page including login. #}
+    {# Language switcher (Milestone Q): a small POST form per language.        #}
+    {# Sits inline in the nav so it shows on every page including login.       #}
+    {# Milestone S: a small globe icon precedes the EN/ES/VI buttons so people #}
+    {# who tap an unfamiliar locale can see at a glance that it's a language   #}
+    {# control (icon is decorative — the wrapping div carries aria-label).      #}
     <div class="lang-switcher" aria-label="{% trans 'Language' %}" style="
       display:flex; align-items:center; gap:0.25rem; margin-left:auto; padding-right:0.75rem;
     ">
+      <svg class="lang-switcher__icon" width="14" height="14" viewBox="0 0 16 16"
+           fill="none" aria-hidden="true" focusable="false"
+           style="opacity:0.6; margin-right:0.15rem; color:var(--text-secondary); flex:none;">
+        <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M1.75 8h12.5M8 1.75c1.9 2 2.9 4.05 2.9 6.25S9.9 12.25 8 14.25M8 1.75c-1.9 2-2.9 4.05-2.9 6.25S6.1 12.25 8 14.25"
+              stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
       {% get_current_language as CURRENT_LANG %}
       {% get_available_languages as AVAILABLE_LANGS %}
       {% for code, name in AVAILABLE_LANGS %}
@@ -311,5 +321,73 @@
   </main>
 
   {% block scripts %}{% endblock %}
+
+  {# Milestone S: auto-detect system language on first visit.                  #}
+  {# Browsers' Accept-Language header is unreliable on iOS/macOS (often emits  #}
+  {# en-US even when the system is Spanish), so we read navigator.language     #}
+  {# directly. Only runs when the user has never made a language choice (no    #}
+  {# django_language cookie and no localstorage marker). Maps es-* → es,       #}
+  {# vi-* → vi, anything else → stays on default (en). On match, posts to       #}
+  {# /i18n/setlang/ which sets the cookie and reloads. Cookie + localStorage   #}
+  {# marker together prevent loops if the user later picks a different lang.   #}
+  <script>
+  (function () {
+    try {
+      // Don't override an existing choice. Either the Django cookie is set,
+      // or our localStorage marker says we already attempted detection.
+      function hasCookie(name) {
+        return document.cookie.split(';').some(function (c) {
+          return c.trim().indexOf(name + '=') === 0;
+        });
+      }
+      if (hasCookie('django_language')) return;
+      if (window.localStorage && localStorage.getItem('pb_lang_autodetected')) return;
+
+      // navigator.languages is the ordered preference list; navigator.language
+      // is the top one. Walk the list so a Spanish-primary user with English
+      // secondary still lands on Spanish.
+      var langs = (navigator.languages && navigator.languages.length)
+        ? navigator.languages
+        : [navigator.language || ''];
+      var target = null;
+      for (var i = 0; i < langs.length; i++) {
+        var code = (langs[i] || '').toLowerCase();
+        if (code.indexOf('es') === 0) { target = 'es'; break; }
+        if (code.indexOf('vi') === 0) { target = 'vi'; break; }
+        if (code.indexOf('en') === 0) { target = null; break; }  // explicit en → stay
+      }
+
+      // Mark detection attempted regardless of outcome so we don't loop.
+      if (window.localStorage) localStorage.setItem('pb_lang_autodetected', '1');
+
+      if (!target) return;
+
+      // Re-use the CSRF token from any existing setlang form (server-rendered).
+      var existing = document.querySelector('.lang-switcher form input[name="csrfmiddlewaretoken"]');
+      if (!existing) return;
+      var setlangAction = document.querySelector('.lang-switcher form').action;
+
+      var form = document.createElement('form');
+      form.method = 'post';
+      form.action = setlangAction;
+      form.style.display = 'none';
+
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = existing.value;
+      form.appendChild(csrf);
+
+      var nextInput = document.createElement('input');
+      nextInput.type = 'hidden'; nextInput.name = 'next'; nextInput.value = window.location.pathname;
+      form.appendChild(nextInput);
+
+      var langInput = document.createElement('input');
+      langInput.type = 'hidden'; langInput.name = 'language'; langInput.value = target;
+      form.appendChild(langInput);
+
+      document.body.appendChild(form);
+      form.submit();
+    } catch (_) { /* fail silently — default English is fine */ }
+  })();
+  </script>
 </body>
 </html>

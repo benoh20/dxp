@@ -2640,8 +2640,20 @@
     document.addEventListener('keydown', onKeydown);
   }());
 
-  /* Scroll to bottom on initial load */
-  scrollToBottom();
+  /* Scroll to bottom on initial load — but only when there are real messages.
+     If the empty-state placeholder is present (no conversation yet), scrolling
+     to the bottom of .chat-scroll lands the viewport on the demo-tile carousel
+     and hides the welcome heading + instructions, especially on mobile where
+     the chat-scroll is taller than the viewport. Mobile audit (Milestone S)
+     surfaced this: users opened the app and saw a half-cut tile instead of
+     "What can I help you win?". Fix: scroll-to-top in the empty state, scroll
+     -to-bottom only when there's a thread to anchor on. */
+  if (document.getElementById('empty-state')) {
+    var scrollEl = document.getElementById('chat-scroll');
+    if (scrollEl) scrollEl.scrollTop = 0;
+  } else {
+    scrollToBottom();
+  }
 }());
 </script>
 {% endblock %}
